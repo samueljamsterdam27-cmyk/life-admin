@@ -1,0 +1,936 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Life">
+<meta name="theme-color" content="#f4f4f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>Life Admin</title>
+<style>
+:root {
+  --bg: #f4f4f1;
+  --card: #ffffff;
+  --ink: #1b1b1a;
+  --muted: #74746f;
+  --line: #e4e4de;
+  --soft: #ececE6;
+  --accent: #2f6f5e;
+  --accent-ink: #ffffff;
+  --accent-soft: #dcebe5;
+  --warn: #b5651d;
+  --warn-soft: #f6e7d6;
+  --bad: #b23a3a;
+  --bad-soft: #f5dede;
+  --good: #2f6f5e;
+  --radius: 14px;
+  --tabh: 58px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121212;
+    --card: #1d1d1c;
+    --ink: #ededea;
+    --muted: #9a9a94;
+    --line: #2d2d2b;
+    --soft: #262625;
+    --accent: #6cc2a6;
+    --accent-ink: #0f1a16;
+    --accent-soft: #1f3530;
+    --warn: #e2a463;
+    --warn-soft: #3a2b1c;
+    --bad: #ec7d7d;
+    --bad-soft: #3d2222;
+    --good: #6cc2a6;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); }
+body {
+  font: 16px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  padding: env(safe-area-inset-top) 0 calc(var(--tabh) + env(safe-area-inset-bottom) + 12px);
+  min-height: 100vh;
+  -webkit-text-size-adjust: 100%;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+main { max-width: 560px; margin: 0 auto; padding: 8px 16px 24px; }
+
+header.top { display: flex; align-items: flex-end; justify-content: space-between; padding: 14px 0 10px; }
+header.top h1 { font-size: 30px; line-height: 1.1; margin: 0; letter-spacing: -0.02em; }
+header.top .sub { color: var(--muted); font-size: 14px; margin-top: 2px; }
+.iconbtn { background: var(--card); border: 1px solid var(--line); width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; padding: 0; }
+.iconbtn svg { width: 20px; height: 20px; }
+
+.card { background: var(--card); border-radius: var(--radius); padding: 14px; margin: 12px 0; border: 1px solid var(--line); }
+.card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 10px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+.card h2 a, .card h2 button.link { text-transform: none; letter-spacing: 0; font-size: 14px; }
+.big { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.row { display: flex; align-items: center; gap: 10px; }
+.row.between { justify-content: space-between; }
+.grow { flex: 1; min-width: 0; }
+.ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat { background: var(--soft); border-radius: 10px; padding: 10px; }
+.stat .v { font-size: 20px; font-weight: 700; }
+.stat .l { font-size: 12px; color: var(--muted); }
+
+.list { list-style: none; margin: 0; padding: 0; }
+.list li { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-top: 1px solid var(--line); min-height: 48px; }
+.list li:first-child { border-top: 0; }
+.list li.tap { cursor: pointer; }
+.list .t { font-weight: 500; }
+.list .s { font-size: 13px; color: var(--muted); }
+.amt { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.group-h { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 14px 0 2px; }
+
+.pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--soft); color: var(--muted); white-space: nowrap; }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.pill.good { background: var(--accent-soft); color: var(--good); }
+button.pill { border: 0; min-height: 30px; padding: 4px 12px; }
+
+.btn { border: 0; background: var(--accent); color: var(--accent-ink); font-weight: 600; border-radius: 12px; padding: 12px 16px; min-height: 46px; }
+.btn.sec { background: var(--soft); color: var(--ink); }
+.btn.danger { background: var(--bad-soft); color: var(--bad); }
+.btn.sm { padding: 6px 12px; min-height: 34px; font-size: 14px; border-radius: 10px; }
+.btn.block { width: 100%; }
+.link { background: none; border: 0; color: var(--accent); font-weight: 600; padding: 4px 0; }
+
+.quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 4px 0 12px; }
+.quick button { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 4px; font-size: 12px; font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 62px; }
+.quick button span.ic { font-size: 20px; line-height: 1; }
+
+.seg { display: flex; background: var(--soft); border-radius: 10px; padding: 3px; margin: 4px 0 8px; }
+.seg button { flex: 1; border: 0; background: transparent; padding: 8px; border-radius: 8px; font-weight: 600; font-size: 14px; color: var(--muted); }
+.seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+
+.bar { height: 8px; background: var(--soft); border-radius: 4px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+.catrow { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; margin: 10px 0; }
+.catrow .bar { grid-column: 1 / -1; }
+
+.chart { display: flex; align-items: flex-end; gap: 6px; height: 110px; padding-top: 6px; }
+.chart .col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; }
+.chart .col i { display: block; width: 100%; background: var(--accent); border-radius: 5px 5px 2px 2px; min-height: 2px; }
+.chart .col.cur i { background: var(--warn); }
+.chart .col span { font-size: 10px; color: var(--muted); }
+.chart .col b { font-size: 10px; font-weight: 600; color: var(--muted); }
+
+.addbar { display: flex; gap: 8px; margin: 4px 0 8px; }
+.addbar input, .addbar select { min-width: 0; }
+input[type=text], input[type=number], input[type=date], input:not([type]), select, textarea {
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 44px; width: 100%; font-size: 16px;
+}
+input[type=date] { -webkit-appearance: none; appearance: none; }
+textarea { min-height: 70px; resize: vertical; }
+label.f { display: block; margin: 0 0 12px; }
+label.f > span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; font-weight: 500; }
+.f2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.f3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.chk { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font-size: 15px; }
+.chk input { width: 22px; height: 22px; accent-color: var(--accent); }
+
+.check { width: 26px; height: 26px; flex: none; border-radius: 50%; border: 2px solid var(--line); background: transparent; display: grid; place-items: center; padding: 0; }
+.check.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.check svg { width: 14px; height: 14px; }
+li.done .t { text-decoration: line-through; color: var(--muted); }
+
+.feel { display: flex; gap: 6px; }
+.feel label { flex: 1; }
+.feel input { display: none; }
+.feel span { display: block; text-align: center; font-size: 24px; padding: 6px 0; border-radius: 10px; background: var(--soft); border: 2px solid transparent; }
+.feel input:checked + span { border-color: var(--accent); background: var(--accent-soft); }
+
+.empty { text-align: center; color: var(--muted); padding: 18px 8px; font-size: 14px; }
+
+nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; background: color-mix(in srgb, var(--card) 88%, transparent); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border-top: 1px solid var(--line); display: flex; padding-bottom: env(safe-area-inset-bottom); z-index: 10; }
+nav.tabs button { flex: 1; border: 0; background: none; height: var(--tabh); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 11px; font-weight: 600; color: var(--muted); }
+nav.tabs button svg { width: 24px; height: 24px; }
+nav.tabs button.on { color: var(--accent); }
+
+.scrim { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 20; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.scrim.on { opacity: 1; pointer-events: auto; }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; background: var(--bg); border-radius: 18px 18px 0 0; max-height: 92vh; overflow-y: auto; transform: translateY(105%); transition: transform .25s ease; padding: 8px 16px calc(16px + env(safe-area-inset-bottom)); max-width: 560px; margin: 0 auto; -webkit-overflow-scrolling: touch; }
+.sheet.on { transform: none; }
+.sheet .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 4px auto 10px; }
+.sheet h3 { margin: 0 0 14px; font-size: 20px; }
+.sheet .actions { display: flex; gap: 8px; margin-top: 6px; }
+.sheet .actions .btn { flex: 1; }
+
+.toast { position: fixed; left: 50%; bottom: calc(var(--tabh) + env(safe-area-inset-bottom) + 14px); transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px; font-weight: 500; opacity: 0; transition: all .2s; z-index: 30; pointer-events: none; max-width: calc(100% - 32px); text-align: center; }
+.toast.on { opacity: 1; transform: translateX(-50%); }
+</style>
+</head>
+<body>
+<main id="app"></main>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Today</button>
+  <button data-tab="money"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/><path d="M6 10h.01M18 15h.01"/></svg>Money</button>
+  <button data-tab="food"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/><circle cx="10" cy="20.5" r="1"/><circle cx="17" cy="20.5" r="1"/></svg>Food</button>
+  <button data-tab="runs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="14" cy="4" r="2"/><path d="M8 21l3-6 3 2v5M6 12l3-4 4 1 3 4 3 1M11 15l-2-3"/></svg>Runs</button>
+  <button data-tab="tasks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6l1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"/></svg>Tasks</button>
+</nav>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+// ---------- storage ----------
+const KEY = 'lifeadmin.v1';
+const AISLES = ['Produce', 'Meat & Fish', 'Dairy & Eggs', 'Bakery', 'Pantry', 'Frozen', 'Snacks & Drinks', 'Household', 'Personal care', 'Other'];
+const DEFAULTS = () => ({
+  v: 1,
+  settings: {
+    name: '',
+    unit: 'mi',
+    currency: '$',
+    categories: ['Groceries', 'Dining out', 'Transport', 'Shopping', 'Bills', 'Subscriptions', 'Fun', 'Health', 'Other'],
+  },
+  expenses: [],
+  bills: [],
+  grocery: [],
+  pantry: [],
+  runs: [],
+  tasks: [],
+  chores: [],
+});
+
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return DEFAULTS();
+    const d = JSON.parse(raw);
+    const base = DEFAULTS();
+    return { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}) } };
+  } catch (e) {
+    return DEFAULTS();
+  }
+}
+let S = load();
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(S)); }
+  catch (e) { toast('Could not save. Export a backup!'); }
+}
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+
+// ---------- helpers ----------
+const $ = (s, el = document) => el.querySelector(s);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pad = n => String(n).padStart(2, '0');
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const today = () => iso(new Date());
+const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); };
+const diffDays = (a, b) => Math.round((parse(a) - parse(b)) / 86400000); // a - b
+function addMonths(s, n, anchor) {
+  const d = parse(s);
+  const day = anchor || d.getDate();
+  const t = new Date(d.getFullYear(), d.getMonth() + n, 1);
+  const last = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
+  t.setDate(Math.min(day, last));
+  return iso(t);
+}
+const money = n => {
+  const neg = n < 0; n = Math.abs(n);
+  const s = n.toLocaleString(undefined, { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });
+  return (neg ? '-' : '') + S.settings.currency + s;
+};
+const money2 = n => S.settings.currency + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const monthKey = s => s.slice(0, 7);
+const monthName = k => { const [y, m] = k.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }); };
+const fmtDate = s => {
+  const n = diffDays(s, today());
+  if (n === 0) return 'Today';
+  if (n === -1) return 'Yesterday';
+  if (n === 1) return 'Tomorrow';
+  const d = parse(s);
+  const opts = { weekday: Math.abs(n) < 7 ? 'short' : undefined, month: 'short', day: 'numeric' };
+  if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+  return d.toLocaleDateString(undefined, opts);
+};
+function dueLabel(s) {
+  const n = diffDays(s, today());
+  if (n < 0) return { t: n === -1 ? '1 day overdue' : `${-n} days overdue`, c: 'bad' };
+  if (n === 0) return { t: 'Due today', c: 'warn' };
+  if (n === 1) return { t: 'Tomorrow', c: 'warn' };
+  if (n <= 7) return { t: `In ${n} days`, c: '' };
+  return { t: fmtDate(s), c: '' };
+}
+const fmtDur = secs => {
+  secs = Math.round(secs);
+  const h = Math.floor(secs / 3600), m = Math.floor(secs % 3600 / 60), s = secs % 60;
+  return h ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+};
+const fmtPace = (secs, dist) => dist > 0 ? `${fmtDur(secs / dist)}/${S.settings.unit}` : '—';
+const fmtDist = d => `${(Math.round(d * 100) / 100).toLocaleString()} ${S.settings.unit}`;
+function weekStart(s) { const d = parse(s); const wd = (d.getDay() + 6) % 7; d.setDate(d.getDate() - wd); return iso(d); } // Monday
+const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+const FEELS = ['😫', '😕', '😐', '🙂', '😄'];
+
+let toastT;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2200);
+}
+
+// ---------- bills logic ----------
+function nextDue(b) {
+  if (b.freq === 'weekly') return addDays(b.next, 7);
+  if (b.freq === 'biweekly') return addDays(b.next, 14);
+  if (b.freq === 'quarterly') return addMonths(b.next, 3, b.anchor);
+  if (b.freq === 'yearly') return addMonths(b.next, 12, b.anchor);
+  return addMonths(b.next, 1, b.anchor);
+}
+const perMonth = b => ({ weekly: 52 / 12, biweekly: 26 / 12, monthly: 1, quarterly: 1 / 3, yearly: 1 / 12 }[b.freq] || 1) * b.amount;
+function payBill(b, silent) {
+  S.expenses.push({ id: uid(), date: b.next <= today() ? b.next : today(), amount: b.amount, cat: b.kind === 'sub' ? 'Subscriptions' : 'Bills', note: b.name, bill: b.id });
+  b.next = nextDue(b);
+  if (!silent) toast(`${b.name} paid · next ${fmtDate(b.next)}`);
+}
+function runAutopay() {
+  let n = 0;
+  for (const b of S.bills) {
+    let guard = 0;
+    while (b.autopay && b.next <= today() && guard++ < 24) { payBill(b, true); n++; }
+  }
+  if (n) save();
+}
+
+// ---------- state / routing ----------
+const ui = { tab: 'today', moneySeg: 'spend', foodSeg: 'list', taskSeg: 'todo', month: monthKey(today()), showDone: false };
+try { Object.assign(ui, JSON.parse(sessionStorage.getItem('la.ui') || '{}'), { month: monthKey(today()) }); } catch (e) {}
+
+function go(tab) { ui.tab = tab; render(); window.scrollTo(0, 0); }
+function render() {
+  try { sessionStorage.setItem('la.ui', JSON.stringify({ tab: ui.tab, moneySeg: ui.moneySeg, foodSeg: ui.foodSeg, taskSeg: ui.taskSeg })); } catch (e) {}
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === ui.tab));
+  $('#app').innerHTML = VIEWS[ui.tab]();
+}
+
+function header(title, sub, right = '') {
+  return `<header class="top"><div><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div>${right}</header>`;
+}
+const seg = (key, opts) => `<div class="seg">${opts.map(([v, l]) => `<button data-a="seg" data-k="${key}" data-v="${v}" class="${ui[key] === v ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+
+// ---------- TODAY ----------
+function choreDue(c) { return c.last ? addDays(c.last, c.every) : today(); }
+
+function viewToday() {
+  const t = today();
+  const h = new Date().getHours();
+  const greet = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  const name = S.settings.name ? `, ${esc(S.settings.name)}` : '';
+  const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+
+  // due soon
+  const items = [];
+  for (const b of S.bills) if (diffDays(b.next, t) <= 7) items.push({ d: b.next, html: `
+    <li><div class="grow"><div class="t ellipsis">${esc(b.name)}</div><div class="s">${money2(b.amount)}${b.autopay ? ' · autopay' : ''}</div></div>
+    <span class="pill ${dueLabel(b.next).c}">${dueLabel(b.next).t}</span>
+    ${b.autopay ? '' : `<button class="btn sm" data-a="paybill" data-id="${b.id}">Paid</button>`}</li>` });
+  for (const x of S.tasks) if (!x.done && x.due && diffDays(x.due, t) <= 1) items.push({ d: x.due, html: `
+    <li><button class="check" data-a="task" data-id="${x.id}"></button><div class="grow"><div class="t">${esc(x.title)}</div></div>
+    <span class="pill ${dueLabel(x.due).c}">${dueLabel(x.due).t}</span></li>` });
+  for (const c of S.chores) { const d = choreDue(c); if (diffDays(d, t) <= 0) items.push({ d, html: `
+    <li><div class="grow"><div class="t">${esc(c.title)}</div><div class="s">Every ${c.every} days</div></div>
+    <span class="pill ${dueLabel(d).c}">${dueLabel(d).t}</span><button class="btn sm sec" data-a="chore" data-id="${c.id}">Done</button></li>` }); }
+  items.sort((a, b) => a.d < b.d ? -1 : 1);
+
+  // money
+  const mk = monthKey(t);
+  const monthExp = S.expenses.filter(e => monthKey(e.date) === mk);
+  const spent = monthExp.reduce((a, e) => a + e.amount, 0);
+  const byCat = {};
+  monthExp.forEach(e => byCat[e.cat] = (byCat[e.cat] || 0) + e.amount);
+  const top = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const endOfMonth = iso(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0));
+  const billsLeft = S.bills.filter(b => b.next <= endOfMonth).reduce((a, b) => a + b.amount, 0);
+
+  // runs
+  const ws = weekStart(t);
+  const wk = S.runs.filter(r => r.date >= ws && r.date <= t);
+  const wkDist = wk.reduce((a, r) => a + r.dist, 0);
+  const lastRun = [...S.runs].sort((a, b) => b.date.localeCompare(a.date))[0];
+
+  // kitchen
+  const listLeft = S.grocery.filter(g => !g.done).length;
+  const low = S.pantry.filter(p => p.status !== 'ok');
+  const expiring = S.pantry.filter(p => p.exp && diffDays(p.exp, t) <= 3);
+
+  return `
+  ${header(`${greet}${name}`, dateStr, `<button class="iconbtn" data-a="settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>`)}
+
+  <div class="quick">
+    <button data-a="addExpense"><span class="ic">💸</span>Expense</button>
+    <button data-a="addRun"><span class="ic">🏃</span>Run</button>
+    <button data-a="quickGrocery"><span class="ic">🛒</span>Grocery</button>
+    <button data-a="addTask"><span class="ic">✅</span>To-do</button>
+  </div>
+
+  <section class="card">
+    <h2>Needs attention</h2>
+    ${items.length ? `<ul class="list">${items.map(i => i.html).join('')}</ul>` : `<div class="empty">You're all caught up. Nothing due this week.</div>`}
+  </section>
+
+  <section class="card tap" data-a="goto" data-v="money">
+    <h2>Spent in ${new Date().toLocaleDateString(undefined, { month: 'long' })} <span class="link">Money ›</span></h2>
+    <div class="big">${money(spent)}</div>
+    <div class="small muted">${billsLeft ? `${money(billsLeft)} in bills still due this month` : 'No more bills due this month'}</div>
+    ${top.map(([c, v]) => `<div class="catrow"><span>${esc(c)}</span><span class="amt">${money(v)}</span><div class="bar"><i style="width:${spent ? v / spent * 100 : 0}%"></i></div></div>`).join('')}
+  </section>
+
+  <section class="card tap" data-a="goto" data-v="runs">
+    <h2>Running this week <span class="link">Runs ›</span></h2>
+    <div class="stats">
+      <div class="stat"><div class="v">${fmtDist(wkDist)}</div><div class="l">distance</div></div>
+      <div class="stat"><div class="v">${wk.length}</div><div class="l">runs</div></div>
+      <div class="stat"><div class="v">${wk.length ? fmtPace(wk.reduce((a, r) => a + r.secs, 0), wkDist).split('/')[0] : '—'}</div><div class="l">avg pace</div></div>
+    </div>
+    <div class="small muted" style="margin-top:8px">${lastRun ? `Last run ${fmtDate(lastRun.date).toLowerCase()}: ${fmtDist(lastRun.dist)} in ${fmtDur(lastRun.secs)}` : 'No runs logged yet'}</div>
+  </section>
+
+  <section class="card tap" data-a="goto" data-v="food">
+    <h2>Kitchen <span class="link">Food ›</span></h2>
+    <div class="row between"><span>Grocery list</span><span class="pill">${listLeft} item${listLeft === 1 ? '' : 's'}</span></div>
+    ${low.length ? `<div class="small muted" style="margin-top:8px">Running low: ${low.slice(0, 6).map(p => esc(p.name)).join(', ')}${low.length > 6 ? '…' : ''}</div>` : ''}
+    ${expiring.length ? `<div class="small" style="margin-top:6px;color:var(--warn)">Use soon: ${expiring.map(p => `${esc(p.name)} (${dueLabel(p.exp).t.toLowerCase().replace('due ', '')})`).join(', ')}</div>` : ''}
+  </section>`;
+}
+
+// ---------- MONEY ----------
+function viewMoney() {
+  return header('Money', '') + seg('moneySeg', [['spend', 'Spending'], ['bills', 'Bills & subs']]) +
+    (ui.moneySeg === 'spend' ? viewSpend() : viewBills());
+}
+function viewSpend() {
+  const mk = ui.month;
+  const exp = S.expenses.filter(e => monthKey(e.date) === mk).sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  const total = exp.reduce((a, e) => a + e.amount, 0);
+  const [y, m] = mk.split('-').map(Number);
+  const prevKey = `${m === 1 ? y - 1 : y}-${pad(m === 1 ? 12 : m - 1)}`;
+  const prevTotal = S.expenses.filter(e => monthKey(e.date) === prevKey).reduce((a, e) => a + e.amount, 0);
+  const byCat = {};
+  exp.forEach(e => byCat[e.cat] = (byCat[e.cat] || 0) + e.amount);
+  const cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+  const isCur = mk === monthKey(today());
+
+  const groups = {};
+  exp.forEach(e => (groups[e.date] = groups[e.date] || []).push(e));
+
+  return `
+  <section class="card">
+    <div class="row between">
+      <button class="link" data-a="month" data-v="-1">‹ Prev</button>
+      <strong>${monthName(mk)}</strong>
+      <button class="link" data-a="month" data-v="1" ${isCur ? 'style="visibility:hidden"' : ''}>Next ›</button>
+    </div>
+    <div class="big" style="margin-top:10px">${money(total)}</div>
+    <div class="small muted">${prevTotal ? `${money(prevTotal)} last month` : '&nbsp;'}</div>
+    ${cats.map(([c, v]) => `<div class="catrow"><span>${esc(c)}</span><span class="amt">${money(v)} <span class="muted small">${Math.round(v / total * 100)}%</span></span><div class="bar"><i style="width:${v / cats[0][1] * 100}%"></i></div></div>`).join('')}
+  </section>
+  <button class="btn block" data-a="addExpense">+ Log expense</button>
+  <section class="card">
+    ${exp.length ? Object.keys(groups).map(d => `<div class="group-h">${fmtDate(d)}</div><ul class="list">${groups[d].map(e => `
+      <li class="tap" data-a="editExpense" data-id="${e.id}"><div class="grow"><div class="t ellipsis">${esc(e.note || e.cat)}</div><div class="s">${esc(e.cat)}</div></div><span class="amt">${money2(e.amount)}</span></li>`).join('')}</ul>`).join('')
+      : '<div class="empty">No spending logged this month.</div>'}
+  </section>`;
+}
+function viewBills() {
+  const bills = [...S.bills].sort((a, b) => a.next.localeCompare(b.next));
+  const subs = S.bills.filter(b => b.kind === 'sub');
+  const monthlyAll = S.bills.reduce((a, b) => a + perMonth(b), 0);
+  const monthlySubs = subs.reduce((a, b) => a + perMonth(b), 0);
+  return `
+  <section class="card">
+    <div class="stats" style="grid-template-columns:1fr 1fr">
+      <div class="stat"><div class="v">${money(Math.round(monthlyAll))}</div><div class="l">fixed costs / month</div></div>
+      <div class="stat"><div class="v">${money(Math.round(monthlySubs))}</div><div class="l">subscriptions / month</div></div>
+    </div>
+    ${subs.length ? `<div class="small muted" style="margin-top:8px">Subscriptions cost about ${money(Math.round(monthlySubs * 12))} a year.</div>` : ''}
+  </section>
+  <button class="btn block" data-a="addBill">+ Add bill or subscription</button>
+  <section class="card">
+    ${bills.length ? `<ul class="list">${bills.map(b => { const dl = dueLabel(b.next); return `
+      <li><div class="grow tap" data-a="editBill" data-id="${b.id}"><div class="t ellipsis">${esc(b.name)} ${b.kind === 'sub' ? '<span class="pill">sub</span>' : ''}</div>
+      <div class="s">${money2(b.amount)} ${b.freq}${b.autopay ? ' · autopay' : ''}</div></div>
+      <span class="pill ${dl.c}">${dl.t}</span>
+      ${b.autopay ? '' : `<button class="btn sm ${diffDays(b.next, today()) <= 7 ? '' : 'sec'}" data-a="paybill" data-id="${b.id}">Paid</button>`}</li>`; }).join('')}</ul>`
+      : '<div class="empty">Add rent, phone, utilities, Spotify, Netflix, gym and so on. You\'ll see what\'s due and what it all costs per month.</div>'}
+  </section>
+  <p class="small muted">Tapping <b>Paid</b> logs it as spending and moves the due date forward. Autopay items do that automatically on the due date.</p>`;
+}
+
+// ---------- FOOD ----------
+function viewFood() {
+  return header('Food', '') + seg('foodSeg', [['list', `Grocery list${S.grocery.length ? ` (${S.grocery.filter(g => !g.done).length})` : ''}`], ['pantry', 'Pantry']]) +
+    (ui.foodSeg === 'list' ? viewList() : viewPantry());
+}
+function aisleSelect(name, val) {
+  return `<select name="${name}" ${name === 'aisle' ? 'style="max-width:42%"' : ''}>${AISLES.map(a => `<option ${a === val ? 'selected' : ''}>${a}</option>`).join('')}</select>`;
+}
+function guessAisle(name) {
+  const n = name.toLowerCase();
+  const p = S.pantry.find(x => x.name.toLowerCase() === n);
+  if (p) return p.aisle;
+  const rules = [
+    ['Produce', /apple|banana|berr|lettuce|spinach|onion|garlic|tomato|potato|carrot|pepper|avocado|lemon|lime|fruit|veg|kale|broccoli|cucumber|herb|cilantro|basil|mushroom|celery|orange|grape/],
+    ['Meat & Fish', /chicken|beef|pork|turkey|salmon|tuna|fish|shrimp|bacon|sausage|steak|ground|meat/],
+    ['Dairy & Eggs', /milk|egg|cheese|yogurt|yoghurt|butter|cream/],
+    ['Bakery', /bread|bagel|tortilla|bun|roll|croissant|pita/],
+    ['Frozen', /frozen|ice cream|pizza/],
+    ['Snacks & Drinks', /chip|cracker|cookie|soda|juice|coffee|tea|water|beer|wine|snack|bar|seltzer|candy|chocolate/],
+    ['Household', /paper|towel|soap|detergent|trash|bag|foil|sponge|clean|dish|toilet/],
+    ['Personal care', /shampoo|toothpaste|deodorant|razor|lotion|floss|conditioner|sunscreen/],
+    ['Pantry', /rice|pasta|bean|oil|vinegar|sauce|flour|sugar|salt|spice|cereal|oat|peanut|honey|can|soup|stock|broth|noodle/],
+  ];
+  for (const [a, re] of rules) if (re.test(n)) return a;
+  return 'Other';
+}
+function viewList() {
+  const groups = {};
+  for (const g of S.grocery) (groups[g.aisle] = groups[g.aisle] || []).push(g);
+  const order = AISLES.filter(a => groups[a]);
+  const checked = S.grocery.filter(g => g.done).length;
+  return `
+  <form class="addbar" data-form="grocery">
+    <input name="name" placeholder="Add an item…" autocomplete="off" enterkeyhint="done">
+    <button class="btn" style="min-width:56px">Add</button>
+  </form>
+  <section class="card">
+    ${S.grocery.length ? order.map(a => `<div class="group-h">${a}</div><ul class="list">${groups[a].sort((x, y) => x.done - y.done).map(g => `
+      <li class="${g.done ? 'done' : ''}"><button class="check ${g.done ? 'on' : ''}" data-a="gcheck" data-id="${g.id}">${g.done ? ICON_CHECK : ''}</button>
+      <div class="grow tap" data-a="gcheck" data-id="${g.id}"><div class="t">${esc(g.name)}${g.qty ? ` <span class="muted">× ${esc(g.qty)}</span>` : ''}</div></div>
+      <button class="link small" data-a="editGrocery" data-id="${g.id}">Edit</button></li>`).join('')}</ul>`).join('')
+      : '<div class="empty">Your list is empty. Add items here, or mark pantry items as Low or Out and they\'ll show up here.</div>'}
+  </section>
+  ${checked ? `<button class="btn block" data-a="finishTrip">Finish trip (${checked} item${checked === 1 ? '' : 's'} in cart)</button>` : ''}`;
+}
+function viewPantry() {
+  const groups = {};
+  for (const p of S.pantry) (groups[p.aisle] = groups[p.aisle] || []).push(p);
+  const order = AISLES.filter(a => groups[a]);
+  const st = { ok: ['Plenty', 'good'], low: ['Low', 'warn'], out: ['Out', 'bad'] };
+  return `
+  <form class="addbar" data-form="pantry">
+    <input name="name" placeholder="Add something you keep stocked…" autocomplete="off" enterkeyhint="done">
+    <button class="btn" style="min-width:56px">Add</button>
+  </form>
+  <p class="small muted" style="margin:0 0 4px">Tap the status to change it. Low or Out adds it to your grocery list.</p>
+  <section class="card">
+    ${S.pantry.length ? order.map(a => `<div class="group-h">${a}</div><ul class="list">${groups[a].sort((x, y) => x.name.localeCompare(y.name)).map(p => `
+      <li><div class="grow tap" data-a="editPantry" data-id="${p.id}"><div class="t">${esc(p.name)}</div>
+      ${p.exp ? `<div class="s" style="${diffDays(p.exp, today()) <= 3 ? 'color:var(--warn)' : ''}">${diffDays(p.exp, today()) < 0 ? 'Expired ' + fmtDate(p.exp) : 'Use by ' + fmtDate(p.exp)}</div>` : ''}</div>
+      <button class="pill ${st[p.status][1]}" data-a="pstatus" data-id="${p.id}">${st[p.status][0]}</button></li>`).join('')}</ul>`).join('')
+      : '<div class="empty">Add staples you like to keep around (eggs, rice, coffee, olive oil). Then you can see what\'s running low.</div>'}
+  </section>`;
+}
+
+// ---------- RUNS ----------
+function viewRuns() {
+  const t = today();
+  const runs = [...S.runs].sort((a, b) => b.date.localeCompare(a.date));
+  const ws = weekStart(t);
+  const sum = arr => arr.reduce((a, r) => a + r.dist, 0);
+  const wk = runs.filter(r => r.date >= ws);
+  const mo = runs.filter(r => monthKey(r.date) === monthKey(t));
+  const yr = runs.filter(r => r.date.slice(0, 4) === t.slice(0, 4));
+
+  // 8 week chart
+  const weeks = [];
+  for (let i = 7; i >= 0; i--) {
+    const s = addDays(ws, -7 * i), e = addDays(s, 6);
+    weeks.push({ s, d: sum(runs.filter(r => r.date >= s && r.date <= e)), cur: i === 0 });
+  }
+  const max = Math.max(...weeks.map(w => w.d), 1);
+  const longest = runs.reduce((a, r) => !a || r.dist > a.dist ? r : a, null);
+  const fastest = runs.filter(r => r.dist >= 1).reduce((a, r) => !a || r.secs / r.dist < a.secs / a.dist ? r : a, null);
+
+  return `${header('Runs', '')}
+  <section class="card">
+    <div class="stats">
+      <div class="stat"><div class="v">${fmtDist(sum(wk))}</div><div class="l">this week · ${wk.length} run${wk.length === 1 ? '' : 's'}</div></div>
+      <div class="stat"><div class="v">${fmtDist(sum(mo))}</div><div class="l">this month</div></div>
+      <div class="stat"><div class="v">${fmtDist(sum(yr))}</div><div class="l">${t.slice(0, 4)}</div></div>
+    </div>
+    <div class="chart" aria-label="Weekly distance, last 8 weeks">${weeks.map(w => `
+      <div class="col ${w.cur ? 'cur' : ''}"><b>${w.d ? Math.round(w.d * 10) / 10 : ''}</b><i style="height:${w.d / max * 75}%"></i><span>${parse(w.s).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}</span></div>`).join('')}
+    </div>
+    ${runs.length ? `<div class="small muted" style="margin-top:10px">Longest: ${fmtDist(longest.dist)} (${fmtDate(longest.date)})${fastest ? ` · Fastest pace: ${fmtPace(fastest.secs, fastest.dist)}` : ''}</div>` : ''}
+  </section>
+  <button class="btn block" data-a="addRun">+ Log a run</button>
+  <section class="card">
+    ${runs.length ? `<ul class="list">${runs.map(r => `
+      <li class="tap" data-a="editRun" data-id="${r.id}"><div style="font-size:24px">${r.feel ? FEELS[r.feel - 1] : '🏃'}</div>
+      <div class="grow"><div class="t">${fmtDist(r.dist)} <span class="muted">· ${fmtDur(r.secs)}</span></div><div class="s ellipsis">${fmtDate(r.date)} · ${fmtPace(r.secs, r.dist)}${r.notes ? ' · ' + esc(r.notes) : ''}</div></div></li>`).join('')}</ul>`
+      : '<div class="empty">No runs yet. Log one and your pace is worked out for you.</div>'}
+  </section>`;
+}
+
+// ---------- TASKS ----------
+function viewTasks() {
+  return header('Tasks', '') + seg('taskSeg', [['todo', 'To-dos'], ['chores', 'Chores']]) + (ui.taskSeg === 'todo' ? viewTodos() : viewChores());
+}
+function viewTodos() {
+  const open = S.tasks.filter(x => !x.done).sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || a.id.localeCompare(b.id));
+  const done = S.tasks.filter(x => x.done).sort((a, b) => (b.doneAt || '').localeCompare(a.doneAt || ''));
+  const li = x => `<li class="${x.done ? 'done' : ''}"><button class="check ${x.done ? 'on' : ''}" data-a="task" data-id="${x.id}">${x.done ? ICON_CHECK : ''}</button>
+    <div class="grow tap" data-a="editTask" data-id="${x.id}"><div class="t">${esc(x.title)}</div>${x.notes ? `<div class="s ellipsis">${esc(x.notes)}</div>` : ''}</div>
+    ${x.due && !x.done ? `<span class="pill ${dueLabel(x.due).c}">${dueLabel(x.due).t}</span>` : ''}</li>`;
+  return `
+  <form class="addbar" data-form="task">
+    <input name="title" placeholder="Add a to-do…" autocomplete="off" enterkeyhint="done">
+    <button class="btn" style="min-width:56px">Add</button>
+  </form>
+  <section class="card">
+    ${open.length ? `<ul class="list">${open.map(li).join('')}</ul>` : '<div class="empty">Nothing on your plate.</div>'}
+  </section>
+  ${done.length ? `<div class="row between"><button class="link" data-a="toggleDone">${ui.showDone ? 'Hide' : 'Show'} completed (${done.length})</button>${ui.showDone ? '<button class="link" data-a="clearDone" style="color:var(--bad)">Clear completed</button>' : ''}</div>
+  ${ui.showDone ? `<section class="card"><ul class="list">${done.map(li).join('')}</ul></section>` : ''}` : ''}
+  <p class="small muted">Tap a to-do to add a due date or notes.</p>`;
+}
+function viewChores() {
+  const chores = [...S.chores].sort((a, b) => choreDue(a).localeCompare(choreDue(b)));
+  return `
+  <button class="btn block" data-a="addChore" style="margin-top:4px">+ Add recurring chore</button>
+  <section class="card">
+    ${chores.length ? `<ul class="list">${chores.map(c => { const d = choreDue(c); const dl = dueLabel(d); return `
+      <li><div class="grow tap" data-a="editChore" data-id="${c.id}"><div class="t">${esc(c.title)}</div>
+      <div class="s">Every ${c.every} day${c.every == 1 ? '' : 's'} · ${c.last ? 'last done ' + fmtDate(c.last).toLowerCase() : 'never done'}</div></div>
+      <span class="pill ${dl.c}">${dl.t}</span><button class="btn sm ${diffDays(d, today()) <= 0 ? '' : 'sec'}" data-a="chore" data-id="${c.id}">Done</button></li>`; }).join('')}</ul>`
+      : '<div class="empty">Things that repeat: laundry every 7 days, change sheets every 14, haircut every 35, car oil every 120…</div>'}
+  </section>`;
+}
+
+const VIEWS = { today: viewToday, money: viewMoney, food: viewFood, runs: viewRuns, tasks: viewTasks };
+
+// ---------- sheet (forms) ----------
+let sheetSubmit = null;
+function openSheet(title, body, onSubmit, opts = {}) {
+  sheetSubmit = onSubmit;
+  $('#sheet').innerHTML = `<div class="grab"></div><h3>${title}</h3><form id="sheetForm">${body}
+    <div class="actions">${opts.del ? '<button type="button" class="btn danger" data-a="sheetDel">Delete</button>' : ''}
+    <button type="button" class="btn sec" data-a="closeSheet">Cancel</button><button class="btn">${opts.ok || 'Save'}</button></div></form>`;
+  sheetDel = opts.del || null;
+  $('#scrim').classList.add('on'); $('#sheet').classList.add('on');
+  $('#sheet').scrollTop = 0;
+  const first = $('#sheet [autofocus]'); if (first) setTimeout(() => first.focus(), 260);
+}
+let sheetDel = null;
+function closeSheet() { $('#scrim').classList.remove('on'); $('#sheet').classList.remove('on'); sheetSubmit = null; sheetDel = null; if (document.activeElement) document.activeElement.blur(); }
+$('#scrim').addEventListener('click', closeSheet);
+$('#sheet').addEventListener('submit', e => {
+  e.preventDefault();
+  const fd = Object.fromEntries(new FormData(e.target));
+  fd._form = e.target;
+  if (sheetSubmit && sheetSubmit(fd) !== false) { save(); closeSheet(); render(); }
+});
+
+const catOptions = sel => S.settings.categories.map(c => `<option ${c === sel ? 'selected' : ''}>${esc(c)}</option>`).join('');
+
+function expenseForm(e) {
+  const isNew = !e;
+  e = e || { date: today(), amount: '', cat: S.settings.categories[0], note: '' };
+  openSheet(isNew ? 'Log expense' : 'Edit expense', `
+    <label class="f"><span>Amount</span><input name="amount" type="number" inputmode="decimal" step="0.01" min="0" required value="${e.amount}" ${isNew ? 'autofocus' : ''}></label>
+    <label class="f"><span>Category</span><select name="cat">${catOptions(e.cat)}</select></label>
+    <label class="f"><span>What for</span><input name="note" value="${esc(e.note)}" placeholder="e.g. Trader Joe's, lunch with Alex"></label>
+    <label class="f"><span>Date</span><input name="date" type="date" value="${e.date}" required></label>`,
+    f => {
+      const amt = parseFloat(f.amount); if (!(amt > 0)) { toast('Enter an amount'); return false; }
+      if (isNew) S.expenses.push({ id: uid(), date: f.date, amount: amt, cat: f.cat, note: f.note.trim() });
+      else Object.assign(e, { date: f.date, amount: amt, cat: f.cat, note: f.note.trim() });
+      if (isNew) toast(`Logged ${money2(amt)}`);
+    }, { del: isNew ? null : () => { S.expenses = S.expenses.filter(x => x !== e); } });
+}
+
+function billForm(b) {
+  const isNew = !b;
+  b = b || { name: '', amount: '', freq: 'monthly', next: today(), autopay: false, kind: 'bill' };
+  const freqs = [['weekly', 'Weekly'], ['biweekly', 'Every 2 weeks'], ['monthly', 'Monthly'], ['quarterly', 'Every 3 months'], ['yearly', 'Yearly']];
+  openSheet(isNew ? 'New bill or subscription' : 'Edit ' + esc(b.name), `
+    <div class="seg" style="margin-top:0">
+      <label style="flex:1"><input type="radio" name="kind" value="bill" ${b.kind !== 'sub' ? 'checked' : ''} hidden><span class="segl">Bill</span></label>
+      <label style="flex:1"><input type="radio" name="kind" value="sub" ${b.kind === 'sub' ? 'checked' : ''} hidden><span class="segl">Subscription</span></label>
+    </div>
+    <label class="f"><span>Name</span><input name="name" value="${esc(b.name)}" required placeholder="Rent, Phone, Spotify…" ${isNew ? 'autofocus' : ''}></label>
+    <div class="f2">
+      <label class="f"><span>Amount</span><input name="amount" type="number" inputmode="decimal" step="0.01" min="0" required value="${b.amount}"></label>
+      <label class="f"><span>How often</span><select name="freq">${freqs.map(([v, l]) => `<option value="${v}" ${v === b.freq ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    </div>
+    <label class="f"><span>Next due date</span><input name="next" type="date" value="${b.next}" required></label>
+    <label class="chk"><input type="checkbox" name="autopay" ${b.autopay ? 'checked' : ''}> Autopay (log it automatically on the due date)</label>`,
+    f => {
+      const amt = parseFloat(f.amount); if (!(amt >= 0)) return false;
+      const data = { name: f.name.trim(), amount: amt, freq: f.freq, next: f.next, anchor: parse(f.next).getDate(), autopay: !!f.autopay, kind: f.kind };
+      if (isNew) S.bills.push({ id: uid(), ...data }); else Object.assign(b, data);
+      runAutopay();
+    }, { del: isNew ? null : () => { S.bills = S.bills.filter(x => x !== b); } });
+}
+
+function runForm(r) {
+  const isNew = !r;
+  r = r || { date: today(), dist: '', secs: 0, feel: 0, notes: '' };
+  const h = Math.floor(r.secs / 3600), m = Math.floor(r.secs % 3600 / 60), s = r.secs % 60;
+  openSheet(isNew ? 'Log a run' : 'Edit run', `
+    <div class="f2">
+      <label class="f"><span>Distance (${S.settings.unit})</span><input name="dist" type="number" inputmode="decimal" step="0.01" min="0" required value="${r.dist}" ${isNew ? 'autofocus' : ''}></label>
+      <label class="f"><span>Date</span><input name="date" type="date" value="${r.date}" required></label>
+    </div>
+    <label class="f"><span>Time</span></label>
+    <div class="f3" style="margin-top:-8px">
+      <label class="f"><span>hours</span><input name="h" type="number" inputmode="numeric" min="0" value="${r.secs ? h : ''}" placeholder="0"></label>
+      <label class="f"><span>min</span><input name="m" type="number" inputmode="numeric" min="0" max="59" value="${r.secs ? m : ''}" placeholder="0"></label>
+      <label class="f"><span>sec</span><input name="s" type="number" inputmode="numeric" min="0" max="59" value="${r.secs ? s : ''}" placeholder="0"></label>
+    </div>
+    <div class="small muted" id="paceOut" style="margin:-4px 0 12px">&nbsp;</div>
+    <label class="f"><span>How did it feel?</span></label>
+    <div class="feel" style="margin:-8px 0 12px">${FEELS.map((e, i) => `<label><input type="radio" name="feel" value="${i + 1}" ${r.feel === i + 1 ? 'checked' : ''}><span>${e}</span></label>`).join('')}</div>
+    <label class="f"><span>Notes</span><input name="notes" value="${esc(r.notes)}" placeholder="Route, weather, how your legs felt…"></label>`,
+    f => {
+      const dist = parseFloat(f.dist);
+      const secs = (parseInt(f.h) || 0) * 3600 + (parseInt(f.m) || 0) * 60 + (parseInt(f.s) || 0);
+      if (!(dist > 0) || !secs) { toast('Enter distance and time'); return false; }
+      const data = { date: f.date, dist, secs, feel: parseInt(f.feel) || 0, notes: f.notes.trim() };
+      if (isNew) { S.runs.push({ id: uid(), ...data }); toast(`Nice. ${fmtDist(dist)} at ${fmtPace(secs, dist)}`); }
+      else Object.assign(r, data);
+    }, { del: isNew ? null : () => { S.runs = S.runs.filter(x => x !== r); } });
+  const upd = () => {
+    const fd = new FormData($('#sheetForm'));
+    const d = parseFloat(fd.get('dist')), secs = (parseInt(fd.get('h')) || 0) * 3600 + (parseInt(fd.get('m')) || 0) * 60 + (parseInt(fd.get('s')) || 0);
+    $('#paceOut').textContent = d > 0 && secs ? `Pace: ${fmtPace(secs, d)}` : ' ';
+  };
+  $('#sheetForm').addEventListener('input', upd); upd();
+}
+
+function groceryForm(g) {
+  openSheet('Edit item', `
+    <label class="f"><span>Item</span><input name="name" value="${esc(g.name)}" required></label>
+    <div class="f2"><label class="f"><span>Quantity</span><input name="qty" value="${esc(g.qty || '')}" placeholder="e.g. 2, 1 lb"></label>
+    <label class="f"><span>Aisle</span>${aisleSelect('aisle2', g.aisle)}</label></div>`,
+    f => { Object.assign(g, { name: f.name.trim(), qty: f.qty.trim(), aisle: f.aisle2 }); },
+    { del: () => { S.grocery = S.grocery.filter(x => x !== g); } });
+}
+
+function pantryForm(p) {
+  openSheet('Edit ' + esc(p.name), `
+    <label class="f"><span>Item</span><input name="name" value="${esc(p.name)}" required></label>
+    <label class="f"><span>Aisle</span>${aisleSelect('aisle2', p.aisle)}</label>
+    <label class="f"><span>Use-by date (optional)</span><input name="exp" type="date" value="${p.exp || ''}"></label>`,
+    f => { Object.assign(p, { name: f.name.trim(), aisle: f.aisle2, exp: f.exp || '' }); },
+    { del: () => { S.pantry = S.pantry.filter(x => x !== p); } });
+}
+
+function finishTripForm() {
+  const done = S.grocery.filter(g => g.done);
+  const newOnes = done.filter(g => !S.pantry.some(p => p.name.toLowerCase() === g.name.toLowerCase()));
+  openSheet('Finish shopping trip', `
+    <p class="muted small" style="margin-top:-6px">${done.length} item${done.length === 1 ? '' : 's'} checked off. Unchecked items stay on the list.</p>
+    <div class="f2">
+      <label class="f"><span>Total spent</span><input name="amount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="Optional" autofocus></label>
+      <label class="f"><span>Store</span><input name="store" placeholder="e.g. Trader Joe's"></label>
+    </div>
+    ${newOnes.length ? `<label class="chk"><input type="checkbox" name="toPantry"> Also add ${newOnes.length} new item${newOnes.length === 1 ? '' : 's'} to pantry</label>` : ''}`,
+    f => {
+      const amt = parseFloat(f.amount);
+      if (amt > 0) S.expenses.push({ id: uid(), date: today(), amount: amt, cat: S.settings.categories.includes('Groceries') ? 'Groceries' : S.settings.categories[0], note: f.store.trim() || 'Groceries' });
+      for (const g of done) {
+        const p = S.pantry.find(x => x.name.toLowerCase() === g.name.toLowerCase());
+        if (p) p.status = 'ok';
+        else if (f.toPantry) S.pantry.push({ id: uid(), name: g.name, aisle: g.aisle, status: 'ok', exp: '' });
+      }
+      S.grocery = S.grocery.filter(g => !g.done);
+      toast(amt > 0 ? `Trip logged · ${money2(amt)}` : 'List cleared, pantry restocked');
+    }, { ok: 'Done' });
+}
+
+function taskForm(x) {
+  const isNew = !x;
+  x = x || { title: '', due: '', notes: '' };
+  openSheet(isNew ? 'New to-do' : 'Edit to-do', `
+    <label class="f"><span>To-do</span><input name="title" value="${esc(x.title)}" required ${isNew ? 'autofocus' : ''}></label>
+    <label class="f"><span>Due date (optional)</span><input name="due" type="date" value="${x.due || ''}"></label>
+    <div class="row" style="gap:6px;margin:-6px 0 12px;flex-wrap:wrap">
+      <button type="button" class="pill" data-a="setdue" data-v="0">Today</button>
+      <button type="button" class="pill" data-a="setdue" data-v="1">Tomorrow</button>
+      <button type="button" class="pill" data-a="setdue" data-v="7">Next week</button>
+      <button type="button" class="pill" data-a="setdue" data-v="">No date</button>
+    </div>
+    <label class="f"><span>Notes</span><textarea name="notes">${esc(x.notes || '')}</textarea></label>`,
+    f => {
+      const data = { title: f.title.trim(), due: f.due, notes: f.notes.trim() };
+      if (isNew) S.tasks.push({ id: uid(), done: false, ...data }); else Object.assign(x, data);
+    }, { del: isNew ? null : () => { S.tasks = S.tasks.filter(t => t !== x); } });
+}
+
+function choreForm(c) {
+  const isNew = !c;
+  c = c || { title: '', every: 7, last: '' };
+  openSheet(isNew ? 'New recurring chore' : 'Edit chore', `
+    <label class="f"><span>Chore</span><input name="title" value="${esc(c.title)}" required placeholder="Laundry, clean bathroom, haircut…" ${isNew ? 'autofocus' : ''}></label>
+    <label class="f"><span>Repeat every (days)</span><input name="every" type="number" inputmode="numeric" min="1" value="${c.every}" required></label>
+    <div class="row" style="gap:6px;margin:-6px 0 12px;flex-wrap:wrap">
+      ${[[1, 'Daily'], [3, '3 days'], [7, 'Weekly'], [14, '2 weeks'], [30, 'Monthly'], [90, '3 months']].map(([v, l]) => `<button type="button" class="pill" data-a="setevery" data-v="${v}">${l}</button>`).join('')}
+    </div>
+    <label class="f"><span>Last done (leave empty if it's due now)</span><input name="last" type="date" value="${c.last || ''}"></label>`,
+    f => {
+      const data = { title: f.title.trim(), every: Math.max(1, parseInt(f.every) || 7), last: f.last };
+      if (isNew) S.chores.push({ id: uid(), ...data }); else Object.assign(c, data);
+    }, { del: isNew ? null : () => { S.chores = S.chores.filter(x => x !== c); } });
+}
+
+function settingsForm() {
+  const st = S.settings;
+  openSheet('Settings', `
+    <label class="f"><span>Your name</span><input name="name" value="${esc(st.name)}" placeholder="For the greeting"></label>
+    <div class="f2">
+      <label class="f"><span>Distance unit</span><select name="unit"><option value="mi" ${st.unit === 'mi' ? 'selected' : ''}>Miles</option><option value="km" ${st.unit === 'km' ? 'selected' : ''}>Kilometers</option></select></label>
+      <label class="f"><span>Currency symbol</span><input name="currency" value="${esc(st.currency)}" maxlength="3"></label>
+    </div>
+    <label class="f"><span>Spending categories (one per line)</span><textarea name="cats" rows="6">${esc(st.categories.join('\n'))}</textarea></label>
+    <div class="card" style="margin:4px 0 14px">
+      <h2>Backup</h2>
+      <p class="small muted" style="margin:0 0 10px">Your data lives only on this phone. Export a backup now and then (saves to Files). Restore it here if you ever lose it.</p>
+      <div class="row"><button type="button" class="btn sec sm grow" data-a="export">Export backup</button>
+      <label class="btn sec sm grow" style="text-align:center;display:grid;place-items:center">Restore backup<input type="file" accept="application/json,.json" data-a="import" hidden></label></div>
+    </div>
+    <button type="button" class="btn danger block" data-a="reset" style="margin-bottom:12px">Erase all data</button>`,
+    f => {
+      const cats = f.cats.split('\n').map(s => s.trim()).filter(Boolean);
+      Object.assign(st, { name: f.name.trim(), unit: f.unit, currency: f.currency.trim() || '$', categories: cats.length ? cats : DEFAULTS().settings.categories });
+    });
+}
+
+// ---------- actions ----------
+const byId = (arr, id) => arr.find(x => x.id === id);
+const ACTIONS = {
+  goto: el => go(el.dataset.v),
+  seg: el => { ui[el.dataset.k] = el.dataset.v; render(); },
+  settings: settingsForm,
+  addExpense: () => expenseForm(),
+  editExpense: el => expenseForm(byId(S.expenses, el.dataset.id)),
+  month: el => { const [y, m] = ui.month.split('-').map(Number); const d = new Date(y, m - 1 + Number(el.dataset.v), 1); ui.month = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; render(); },
+  addBill: () => billForm(),
+  editBill: el => billForm(byId(S.bills, el.dataset.id)),
+  paybill: el => { payBill(byId(S.bills, el.dataset.id)); save(); render(); },
+  addRun: () => runForm(),
+  editRun: el => runForm(byId(S.runs, el.dataset.id)),
+  quickGrocery: () => { ui.foodSeg = 'list'; go('food'); setTimeout(() => $('[data-form=grocery] input').focus(), 50); },
+  gcheck: el => { const g = byId(S.grocery, el.dataset.id); g.done = !g.done; save(); render(); },
+  editGrocery: el => groceryForm(byId(S.grocery, el.dataset.id)),
+  finishTrip: finishTripForm,
+  pstatus: el => {
+    const p = byId(S.pantry, el.dataset.id);
+    p.status = { ok: 'low', low: 'out', out: 'ok' }[p.status];
+    if (p.status !== 'ok' && !S.grocery.some(g => g.name.toLowerCase() === p.name.toLowerCase())) {
+      S.grocery.push({ id: uid(), name: p.name, aisle: p.aisle, qty: '', done: false });
+      toast(`${p.name} added to grocery list`);
+    }
+    save(); render();
+  },
+  editPantry: el => pantryForm(byId(S.pantry, el.dataset.id)),
+  addTask: () => taskForm(),
+  editTask: el => taskForm(byId(S.tasks, el.dataset.id)),
+  task: el => { const x = byId(S.tasks, el.dataset.id); x.done = !x.done; x.doneAt = x.done ? new Date().toISOString() : ''; save(); render(); if (x.done) toast('Done ✓'); },
+  toggleDone: () => { ui.showDone = !ui.showDone; render(); },
+  clearDone: () => { if (confirm('Delete all completed to-dos?')) { S.tasks = S.tasks.filter(x => !x.done); save(); render(); } },
+  addChore: () => choreForm(),
+  editChore: el => choreForm(byId(S.chores, el.dataset.id)),
+  chore: el => { const c = byId(S.chores, el.dataset.id); c.last = today(); save(); render(); toast(`${c.title} · next ${fmtDate(choreDue(c)).toLowerCase()}`); },
+  setdue: el => { $('#sheetForm [name=due]').value = el.dataset.v === '' ? '' : addDays(today(), Number(el.dataset.v)); },
+  setevery: el => { $('#sheetForm [name=every]').value = el.dataset.v; },
+  closeSheet: closeSheet,
+  sheetDel: () => { if (sheetDel && confirm('Delete this?')) { sheetDel(); save(); closeSheet(); render(); } },
+  export: async () => {
+    const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' });
+    const name = `life-admin-backup-${today()}.json`;
+    const file = new File([blob], name, { type: 'application/json' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: name }); return; } catch (e) { if (e.name === 'AbortError') return; }
+    }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  },
+  reset: () => {
+    if (confirm('Erase everything in this app? Export a backup first if you might want it back.') && confirm('Really erase all data?')) {
+      S = DEFAULTS(); save(); closeSheet(); go('today'); toast('All data erased');
+    }
+  },
+};
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-a]');
+  if (!el || el.tagName === 'INPUT') return;
+  const fn = ACTIONS[el.dataset.a];
+  if (fn) { e.preventDefault(); fn(el); }
+});
+document.addEventListener('change', e => {
+  if (e.target.dataset.a !== 'import' || !e.target.files[0]) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const d = JSON.parse(r.result);
+      if (!d || !d.settings || !Array.isArray(d.expenses)) throw new Error('bad');
+      if (!confirm('Replace everything in the app with this backup?')) return;
+      const base = DEFAULTS();
+      S = { ...base, ...d, settings: { ...base.settings, ...d.settings } };
+      save(); closeSheet(); render(); toast('Backup restored');
+    } catch (err) { toast("That file isn't a Life Admin backup"); }
+  };
+  r.readAsText(e.target.files[0]);
+});
+$('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) go(b.dataset.tab); });
+
+// inline add forms
+document.addEventListener('submit', e => {
+  const kind = e.target.dataset.form;
+  if (!kind) return;
+  e.preventDefault();
+  const input = e.target.querySelector('input');
+  const val = input.value.trim();
+  if (!val) return;
+  if (kind === 'grocery') {
+    if (S.grocery.some(g => g.name.toLowerCase() === val.toLowerCase() && !g.done)) { toast('Already on the list'); input.value = ''; return; }
+    S.grocery.push({ id: uid(), name: val, aisle: guessAisle(val), qty: '', done: false });
+  } else if (kind === 'pantry') {
+    S.pantry.push({ id: uid(), name: val, aisle: guessAisle(val), status: 'ok', exp: '' });
+  } else if (kind === 'task') {
+    S.tasks.push({ id: uid(), title: val, due: '', notes: '', done: false });
+  }
+  save(); render();
+  const again = $(`[data-form=${kind}] input`); if (again) again.focus();
+});
+
+// bill/sub segmented radio styling
+const segStyle = document.createElement('style');
+segStyle.textContent = `.segl{display:block;text-align:center;padding:8px;border-radius:8px;font-weight:600;font-size:14px;color:var(--muted)} input:checked+.segl{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}`;
+document.head.appendChild(segStyle);
+
+// refresh "today" when reopened on a new day
+let lastDay = today();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && today() !== lastDay) { lastDay = today(); ui.month = monthKey(lastDay); runAutopay(); render(); }
+});
+
+runAutopay();
+render();
+
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
