@@ -228,6 +228,7 @@ const DEFAULTS = () => ({
   study: { read: {}, bg: {}, chair: {} },
   course: null,
   cstate: { done: {}, offset: 0, asg: {}, have: {} },
+  cal: {},
 });
 
 function merge(d) {
@@ -305,6 +306,56 @@ const fmtDist = d => `${(Math.round(d * 100) / 100).toLocaleString()} ${S.settin
 function weekStart(s) { const d = parse(s); const wd = (d.getDay() + 6) % 7; d.setDate(d.getDate() - wd); return iso(d); } // Monday
 const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 const FEELS = ['😫', '😕', '😐', '🙂', '😄'];
+
+// ---------- calendar export (.ics) ----------
+// ev: { key, title, date, start?, end?, allDay?, location?, notes?, alarms: ['-PT1H', ...], rrule? }
+function icsText(events) {
+  const escTxt = s => String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+  const d8 = s => s.replace(/-/g, '');
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  const fold = l => { const out = []; while (l.length > 74) { out.push(l.slice(0, 74)); l = ' ' + l.slice(74); } out.push(l); return out.join('\r\n'); };
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Life Admin//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
+  for (const e of events) {
+    lines.push('BEGIN:VEVENT', `UID:${e.key.replace(/[^A-Za-z0-9-]/g, '-')}@life-admin`, `DTSTAMP:${stamp}`);
+    if (e.allDay) lines.push(`DTSTART;VALUE=DATE:${d8(e.date)}`, `DTEND;VALUE=DATE:${d8(addDays(e.date, 1))}`);
+    else {
+      const endDate = toMin(e.end) <= toMin(e.start) ? addDays(e.date, 1) : e.date;
+      lines.push(`DTSTART:${d8(e.date)}T${e.start.replace(':', '')}00`, `DTEND:${d8(endDate)}T${e.end.replace(':', '')}00`);
+    }
+    lines.push(`SUMMARY:${escTxt(e.title)}`);
+    if (e.location) lines.push(`LOCATION:${escTxt(e.location)}`);
+    if (e.notes) lines.push(`DESCRIPTION:${escTxt(e.notes)}`);
+    if (e.rrule) lines.push(`RRULE:${e.rrule}`);
+    for (const a of e.alarms || []) lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${escTxt(e.title)}`, `TRIGGER:${a}`, 'END:VALARM');
+    lines.push('END:VEVENT');
+  }
+  lines.push('END:VCALENDAR');
+  return lines.map(fold).join('\r\n') + '\r\n';
+}
+function addToCalendar(events, label) {
+  if (!events.length) { toast('Nothing new to add'); return; }
+  const ics = icsText(events);
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let opened = false;
+  if (ios) { try { opened = !!window.open('data:text/calendar;charset=utf-8,' + encodeURIComponent(ics), '_blank'); } catch (e) {} }
+  if (!opened) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
+    a.download = `${label.replace(/[^A-Za-z0-9 -]/g, '').trim() || 'events'}.ics`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+  events.forEach(e => S.cal[e.key] = today());
+  save(); render();
+  toast(`${events.length} event${events.length === 1 ? '' : 's'} sent to Calendar`);
+}
+const shiftEvent = s => ({ key: `shift-${s.id}`, title: '☕ Café shift', date: s.date, start: s.start, end: s.end, notes: s.note, alarms: ['-PT1H'] });
+const sessionEvent = s => ({ key: `plotinus-${s.date}`, title: `📜 Plotinus: ${s.label}${S.study.chair[s.date] ? ' (chairing)' : ''}`, date: s.date, start: '11:00', end: '13:00',
+  location: PLOTINUS.where, notes: `${PLOTINUS.text}, ${PLOTINUS.trans}. ${s.label === 'Catch-up' ? 'Catch-up session.' : `Read ${s.label.toLowerCase()} beforehand.`}`, alarms: ['-P1D', '-PT1H'] });
+const asgEvent = a => ({ key: `asg-${a.n}-${asgDue(a)}`, title: `✍️ A${a.n} due: ${a.title}`, date: asgDue(a), allDay: true, notes: `${a.length}. ${a.prompt}`, alarms: ['-P2DT15H', '-PT15H'] });
+const BILL_RRULE = { weekly: 'FREQ=WEEKLY', biweekly: 'FREQ=WEEKLY;INTERVAL=2', monthly: 'FREQ=MONTHLY', quarterly: 'FREQ=MONTHLY;INTERVAL=3', yearly: 'FREQ=YEARLY' };
+const billEvent = b => ({ key: `bill-${b.id}-${b.amount}-${b.freq}`, title: `💸 ${b.name} ${money2(b.amount)}${b.autopay ? ' (autopay)' : ''}`, date: b.next, allDay: true, rrule: BILL_RRULE[b.freq] || BILL_RRULE.monthly, alarms: ['-PT15H'] });
+const calBtn = (action, label, extra = '') => `<button type="button" class="btn sec block" data-a="${action}" ${extra} style="margin:4px 0 8px">📅 ${label}</button>`;
 
 let toastT;
 function toast(msg) {
@@ -523,6 +574,7 @@ function viewBills() {
     ${subs.length ? `<div class="small muted" style="margin-top:8px">Subscriptions cost about ${money(Math.round(monthlySubs * 12))} a year.</div>` : ''}
   </section>
   <button class="btn block" data-a="addBill">+ Add bill or subscription</button>
+  ${S.bills.filter(b => !S.cal[billEvent(b).key]).length ? calBtn('calBills', `Add ${S.bills.filter(b => !S.cal[billEvent(b).key]).length} bill${S.bills.filter(b => !S.cal[billEvent(b).key]).length === 1 ? '' : 's'} to Calendar (repeating)`) : ''}
   <section class="card">
     ${bills.length ? `<ul class="list">${bills.map(b => { const dl = dueLabel(b.next); return `
       <li><div class="grow tap" data-a="editBill" data-id="${b.id}"><div class="t ellipsis">${esc(b.name)} ${b.kind === 'sub' ? '<span class="pill">sub</span>' : ''}</div>
@@ -703,13 +755,14 @@ function viewShifts() {
   const up = upcomingShifts();
   const past = S.shifts.filter(shiftEnded).sort((a, b) => (b.date + b.start).localeCompare(a.date + a.start)).slice(0, 10);
   const li = s => { const c = clashText(s); return `<li class="tap" data-a="editShift" data-id="${s.id}"><div class="grow"><div class="t">${fmtDate(s.date)} · ${s.start}–${s.end}</div>
-    <div class="s">${fmtHours(shiftHours(s))}${s.note ? ' · ' + esc(s.note) : ''}</div></div>${c ? `<span class="pill bad">${c}</span>` : ''}</li>`; };
+    <div class="s">${fmtHours(shiftHours(s))}${s.note ? ' · ' + esc(s.note) : ''}${S.cal[shiftEvent(s).key] ? ' · 📅 in Calendar' : ''}</div></div>${c ? `<span class="pill bad">${c}</span>` : ''}</li>`; };
   const grp = (label, arr) => arr.length ? `<div class="group-h">${label}</div><ul class="list">${arr.map(li).join('')}</ul>` : '';
   return `
   <section class="card"><div class="stats" style="grid-template-columns:1fr 1fr">
     <div class="stat"><div class="v">${fmtHours(thisH)}</div><div class="l">this week</div></div>
     <div class="stat"><div class="v">${fmtHours(nextH)}</div><div class="l">next week</div></div></div></section>
   <div class="row"><button class="btn grow" data-a="pasteShifts">Paste boss's text</button><button class="btn sec" data-a="addShift">+ Add</button></div>
+  ${up.filter(s => !S.cal[shiftEvent(s).key]).length ? calBtn('calShifts', `Add ${up.filter(s => !S.cal[shiftEvent(s).key]).length} new shift${up.filter(s => !S.cal[shiftEvent(s).key]).length === 1 ? '' : 's'} to Calendar`) : ''}
   <section class="card">
     ${up.length ? grp('This week', up.filter(s => s.date < nws)) + grp('Next week', up.filter(s => s.date >= nws && s.date < addDays(nws, 7))) + grp('Later', up.filter(s => s.date >= addDays(nws, 7)))
       : '<div class="empty">No shifts coming up. When your boss texts the rota, copy the message and tap <b>Paste boss\'s text</b>.</div>'}
@@ -770,7 +823,8 @@ function shiftForm(s) {
     <label class="f"><span>Date</span><input name="date" type="date" value="${s.date}" required></label>
     <div class="f2"><label class="f"><span>Start</span><input name="start" type="time" value="${s.start}" required></label>
     <label class="f"><span>End</span><input name="end" type="time" value="${s.end}" required></label></div>
-    <label class="f"><span>Note</span><input name="note" value="${esc(s.note)}" placeholder="e.g. covering for Jess"></label>`,
+    <label class="f"><span>Note</span><input name="note" value="${esc(s.note)}" placeholder="e.g. covering for Jess"></label>
+    ${isNew ? '' : calBtn('calShift', S.cal[shiftEvent(s).key] ? 'Add to Calendar again' : 'Add this shift to Calendar', `data-id="${s.id}"`)}`,
     f => {
       const data = { date: f.date, start: f.start, end: f.end, note: f.note.trim() };
       if (isNew) {
@@ -947,7 +1001,7 @@ function viewPlotinus() {
       <li style="${past && !isNext ? 'opacity:.6' : ''}">${s.label === 'Catch-up' ? '<div style="width:26px"></div>' : `<button class="check ${read ? 'on' : ''}" data-a="readCh" data-d="${s.date}">${read ? ICON_CHECK : ''}</button>`}
       <div class="grow"><div class="t">${s.label}${isNext ? ' <span class="pill warn">next</span>' : ''}</div><div class="s">${parse(s.date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}${s.chair ? ' · chair: ' + s.chair : ''}</div></div>
       ${s.label === 'Catch-up' || past ? (S.study.chair[s.date] ? '<span class="pill good">chaired</span>' : '') : `<button class="pill ${S.study.chair[s.date] ? 'good' : ''}" data-a="chair" data-d="${s.date}">${S.study.chair[s.date] ? 'Chairing ✓' : 'Chair?'}</button>`}</li>`; }).join('')}
-  </ul></section>
+  </ul>${PLOTINUS.sessions.some(s => s.date >= today() && !S.cal[sessionEvent(s).key]) ? calBtn('calPlotinus', 'Add the remaining sessions to Calendar') : '<p class="small muted" style="margin:8px 0 0">📅 Remaining sessions are in your Calendar.</p>'}</section>
   <section class="card"><h2>Background reading <span class="small muted" style="text-transform:none;letter-spacing:0">${nBg}/${PLOTINUS.background.length}</span></h2><ul class="list">
     ${PLOTINUS.background.map(([t, url], i) => `<li><button class="check ${S.study.bg[i] ? 'on' : ''}" data-a="bgRead" data-i="${i}">${S.study.bg[i] ? ICON_CHECK : ''}</button>
       <div class="grow small">${esc(t)}${url ? ` <a href="${url}" target="_blank" rel="noopener" style="color:var(--accent)">open ↗</a>` : ''}</div></li>`).join('')}
@@ -999,7 +1053,7 @@ function asgLi(a) {
     <span class="pill ${st === 'assessed' ? 'good' : st === 'sent' ? 'good' : dn < 0 ? 'bad' : dn <= 3 ? 'warn' : ''}">${ASG_STATUS.find(s => s[0] === st)[1]}</span></li>`;
 }
 function viewCourse() {
-  const importBtn = `<label class="btn sec block" style="text-align:center;display:grid;place-items:center;margin-top:8px">Import from Files<input type="file" accept="application/json,.json" data-a="importIdeas" hidden></label>`;
+  const importBtn = `<label class="btn sec block" style="text-align:center;display:grid;place-items:center;margin-top:8px">Import from Files<input type="file" data-a="importIdeas" hidden></label>`;
   if (!C()) return `<section class="card"><h2>Esotericism course</h2><div class="empty" style="text-align:left">
     Your course lives in Obsidian (the <b>esotericism</b> vault). To bring it in:<br><br>
     1. On your Mac, double-click <b>Sync Obsidian</b> in Desktop › programs.<br><br>
@@ -1035,7 +1089,8 @@ function viewCourse() {
   ${soon.length ? `<section class="card"><h2>Books to get soon</h2><ul class="list">${soon.map(b => `<li><div class="grow"><div class="t small" style="font-size:15px">${esc(b.text)}</div><div class="s">Week ${b.weeks.join(', ')} · ${esc(b.edition)}</div></div>
     <button class="pill" data-a="haveBook" data-t="${esc(b.text)}">Got it</button></li>`).join('')}</ul></section>` : ''}
   <section class="card"><h2>Assignments</h2><ul class="list">${c.assignments.map(asgLi).join('')}</ul>
-    <p class="small muted" style="margin:8px 0 0">Draft in Obsidian under Submissions (e.g. "A1 - …"). Word counts update each time you sync.</p></section>
+    ${c.assignments.some(a => asgStatus(a) !== 'assessed' && !S.cal[asgEvent(a).key]) ? calBtn('calAsgs', 'Add due dates to Calendar') : '<p class="small muted" style="margin:8px 0 0">📅 Due dates are in your Calendar.</p>'}
+    <p class="small muted" style="margin:8px 0 0">Draft in Obsidian under Submissions (e.g. "A1 - …"). Word counts update each time you sync. If you push the plan back, add the due dates again: the moved ones are added as new events.</p></section>
   <section class="card"><h2>All weeks</h2>
     ${c.weeks.map(x => { const core = coreItems(x), dn = core.filter(i => itemDone(x, i)).length; return `<details style="border-top:1px solid var(--line);padding:10px 0">
       <summary style="cursor:pointer;display:flex;gap:10px;align-items:center"><span class="key" style="${weekDone(x) ? '' : 'background:var(--soft);color:var(--muted)'}">${x.n}</span><span class="grow"><span class="t">${esc(x.title)}</span><br><span class="s muted small">${weekRange(x.n)} · ${dn}/${core.length}</span></span></summary>
@@ -1057,6 +1112,7 @@ function asgForm(a) {
     <label class="f"><span>Status</span></label>
     <div class="radios" style="margin-top:-8px">${ASG_STATUS.map(([v, l]) => `<label><input type="radio" name="status" value="${v}" ${st === v ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>
     ${c.criteria.length ? `<details style="margin:0 0 12px"><summary class="link" style="cursor:pointer">How it's assessed</summary><ul class="small" style="padding-left:18px;line-height:1.5">${c.criteria.map(k => `<li><b>${esc(k.name)}:</b> ${esc(k.text)}</li>`).join('')}</ul></details>` : ''}
+    ${calBtn('calAsg', S.cal[asgEvent(a).key] ? 'Add due date to Calendar again' : 'Add due date to Calendar', `data-n="${a.n}"`)}
     ${a.draft ? `<a class="btn sec" href="${obsLink(a.draft.note)}" style="margin-bottom:8px">Open draft in Obsidian ↗</a>` : c.assignmentsNote ? `<a class="btn sec" href="${obsLink(c.assignmentsNote)}" style="margin-bottom:8px">Open Assignments in Obsidian ↗</a>` : ''}`,
     f => { S.cstate.asg[a.n] = f.status; });
 }
@@ -1072,7 +1128,7 @@ function ideaLi(i) {
 }
 function viewIdeas() {
   const order = ['drafting', 'developing', 'seed', 'written', 'shelved'];
-  const head = `<div class="row" style="margin:4px 0 8px"><label class="btn sec grow" style="text-align:center;display:grid;place-items:center">Import from Files<input type="file" accept="application/json,.json" data-a="importIdeas" hidden></label></div>`;
+  const head = `<div class="row" style="margin:4px 0 8px"><label class="btn sec grow" style="text-align:center;display:grid;place-items:center">Import from Files<input type="file" data-a="importIdeas" hidden></label></div>`;
   if (!S.ideas.length) return head + `<section class="card"><div class="empty" style="text-align:left">
     <b>How to bring in your essay ideas</b><br><br>
     1. On your Mac, double-click <b>Sync Obsidian</b> in Desktop › programs. It reads your vaults and saves <b>life-admin-sync.json</b> to iCloud Drive › Life Admin.<br><br>
@@ -1165,7 +1221,8 @@ function billForm(b) {
       <label class="f"><span>How often</span><select name="freq">${freqs.map(([v, l]) => `<option value="${v}" ${v === b.freq ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     </div>
     <label class="f"><span>Next due date</span><input name="next" type="date" value="${b.next}" required></label>
-    <label class="chk"><input type="checkbox" name="autopay" ${b.autopay ? 'checked' : ''}> Autopay (log it automatically on the due date)</label>`,
+    <label class="chk"><input type="checkbox" name="autopay" ${b.autopay ? 'checked' : ''}> Autopay (log it automatically on the due date)</label>
+    ${isNew ? '' : calBtn('calBill', S.cal[billEvent(b).key] ? 'Add to Calendar again' : 'Add to Calendar (repeats)', `data-id="${b.id}"`)}`,
     f => {
       const amt = parseFloat(f.amount); if (!(amt >= 0)) return false;
       const data = { name: f.name.trim(), amount: amt, freq: f.freq, next: f.next, anchor: parse(f.next).getDate(), autopay: !!f.autopay, kind: f.kind };
@@ -1298,7 +1355,7 @@ function settingsForm() {
       <h2>Backup</h2>
       <p class="small muted" style="margin:0 0 10px">Your data lives only on this phone. Export a backup now and then (saves to Files). Restore it here if you ever lose it.</p>
       <div class="row"><button type="button" class="btn sec sm grow" data-a="export">Export backup</button>
-      <label class="btn sec sm grow" style="text-align:center;display:grid;place-items:center">Restore backup<input type="file" accept="application/json,.json" data-a="import" hidden></label></div>
+      <label class="btn sec sm grow" style="text-align:center;display:grid;place-items:center">Restore backup<input type="file" data-a="import" hidden></label></div>
     </div>
     <button type="button" class="btn danger block" data-a="reset" style="margin-bottom:12px">Erase all data</button>`,
     f => {
@@ -1362,6 +1419,13 @@ const ACTIONS = {
   shiftPlan: el => { S.cstate.offset = Math.max(0, (S.cstate.offset || 0) + Number(el.dataset.v)); save(); render(); toast(Number(el.dataset.v) > 0 ? 'Plan pushed back a week' : 'Shift undone'); },
   haveBook: el => { S.cstate.have[el.dataset.t] = 'yes'; save(); render(); },
   openAsg: el => asgForm(C().assignments.find(a => a.n === Number(el.dataset.n))),
+  calShifts: () => addToCalendar(upcomingShifts().filter(s => !S.cal[shiftEvent(s).key]).map(shiftEvent), 'Shifts'),
+  calShift: el => { addToCalendar([shiftEvent(byId(S.shifts, el.dataset.id))], 'Shift'); closeSheet(); },
+  calPlotinus: () => addToCalendar(PLOTINUS.sessions.filter(s => s.date >= today() && !S.cal[sessionEvent(s).key]).map(sessionEvent), 'Plotinus reading group'),
+  calAsgs: () => addToCalendar(C().assignments.filter(a => asgStatus(a) !== 'assessed' && !S.cal[asgEvent(a).key]).map(asgEvent), 'Assignment due dates'),
+  calAsg: el => { addToCalendar([asgEvent(C().assignments.find(a => a.n === Number(el.dataset.n)))], 'Assignment'); closeSheet(); },
+  calBills: () => addToCalendar(S.bills.filter(b => !S.cal[billEvent(b).key]).map(billEvent), 'Bills'),
+  calBill: el => { addToCalendar([billEvent(byId(S.bills, el.dataset.id))], 'Bill'); closeSheet(); },
   closeSheet: closeSheet,
   sheetDel: () => { if (sheetDel && confirm('Delete this?')) { sheetDel(); save(); closeSheet(); render(); } },
   export: async () => {
