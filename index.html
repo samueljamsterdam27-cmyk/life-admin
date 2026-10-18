@@ -226,11 +226,13 @@ const DEFAULTS = () => ({
   pieces: [],
   ideas: [],
   study: { read: {}, bg: {}, chair: {} },
+  course: null,
+  cstate: { done: {}, offset: 0, asg: {}, have: {} },
 });
 
 function merge(d) {
   const base = DEFAULTS();
-  return { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}) }, study: { ...base.study, ...(d.study || {}) } };
+  return { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}) }, study: { ...base.study, ...(d.study || {}) }, cstate: { ...base.cstate, ...(d.cstate || {}) } };
 }
 function load() {
   try {
@@ -372,7 +374,7 @@ function weekCard() {
       <div class="s muted">${PLOTINUS.text}${S.study.chair[ses.date] ? ' · <b>you\'re chairing</b>' : ''}</div></div>
       ${ses.label === 'Catch-up' ? '' : `<button class="check ${read ? 'on' : ''}" data-a="readCh" data-d="${ses.date}" aria-label="Mark read">${read ? ICON_CHECK : ''}</button>`}</div>`);
   }
-  rows.push(`<div class="wk tap" data-a="goto" data-v="study" data-s="course"><div class="ic">🕯️</div><div class="grow"><div class="t">Medieval philosophy & mysticism</div><div class="s muted">About 8 hrs this week · your course plan arrives soon</div></div></div>`);
+  rows.push(courseTodayRow());
   const pieces = S.pieces.filter(p => curStage(p));
   if (pieces.length) {
     const p = [...pieces].sort((a, b) => pieceUrgency(b) - pieceUrgency(a))[0];
@@ -924,7 +926,7 @@ function nextSession() {
 }
 function viewStudy() {
   const sub = { plotinus: viewPlotinus, course: viewCourse, ideas: viewIdeas }[ui.studySeg] || viewPlotinus;
-  return header('Study', '') + seg('studySeg', [['plotinus', 'Plotinus'], ['course', 'Medieval'], ['ideas', `Essay ideas${S.ideas.length ? ` (${S.ideas.length})` : ''}`]]) + sub();
+  return header('Study', '') + seg('studySeg', [['plotinus', 'Plotinus'], ['course', 'Esoterica'], ['ideas', `Essay ideas${S.ideas.length ? ` (${S.ideas.length})` : ''}`]]) + sub();
 }
 function viewPlotinus() {
   const nx = nextSession();
@@ -951,14 +953,112 @@ function viewPlotinus() {
       <div class="grow small">${esc(t)}${url ? ` <a href="${url}" target="_blank" rel="noopener" style="color:var(--accent)">open ↗</a>` : ''}</div></li>`).join('')}
   </ul><p class="small muted" style="margin:8px 0 0">Optional. Emilsson or O'Meara for Plotinus in general; the rest on fate and freedom.</p></section>`;
 }
+// course (imported from the esotericism vault)
+const C = () => S.course;
+const KIND = { primary: ['Primary', 'good'], secondary: ['Secondary', ''], optional: ['Optional', ''], latin: ['Latin', 'warn'], other: ['', ''] };
+const itemKey = (w, it) => `${w.n}:${it.text.slice(0, 80)}`;
+const itemDone = (w, it) => it.done || !!S.cstate.done[itemKey(w, it)];
+const coreItems = w => w.items.filter(i => i.kind !== 'optional');
+const weekDone = w => coreItems(w).every(i => itemDone(w, i));
+const cWeekStart = n => addDays(C().start, 7 * (n - 1 + (S.cstate.offset || 0)));
+const calWeek = () => Math.floor(diffDays(today(), C().start) / 7) - (S.cstate.offset || 0) + 1;
+function focusWeek() {
+  const ws = C().weeks, cw = calWeek();
+  if (cw < 1) return ws[0];
+  const firstOpen = ws.find(w => !weekDone(w));
+  if (!firstOpen) return null;
+  return firstOpen.n <= cw ? firstOpen : ws.find(w => w.n === Math.min(cw, ws.length));
+}
+const asgDue = a => addDays(cWeekStart(a.week), 6);
+const asgStatus = a => S.cstate.asg[a.n] || (a.draft && a.draft.words > 30 ? 'drafting' : 'todo');
+const ASG_STATUS = [['todo', 'Not started'], ['drafting', 'Drafting'], ['sent', 'Sent to Claude'], ['assessed', 'Assessed']];
+const targetWords = a => { const m = (a.length || '').replace(/,/g, '').match(/\d+/); return m ? Number(m[0]) : 0; };
+const obsLink = note => C() && note ? `obsidian://open?vault=${encodeURIComponent(C().vault)}&file=${encodeURIComponent(note.replace(/\.md$/, ''))}` : '';
+const weekRange = n => `${parse(cWeekStart(n)).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} – ${parse(addDays(cWeekStart(n), 6)).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`;
+
+function courseTodayRow() {
+  if (!C()) return `<div class="wk tap" data-a="goto" data-v="study" data-s="course"><div class="ic">🕯️</div><div class="grow"><div class="t">Esotericism course</div><div class="s muted">Import it from Obsidian to see this week's reading</div></div></div>`;
+  const w = focusWeek();
+  if (!w) return `<div class="wk tap" data-a="goto" data-v="study" data-s="course"><div class="ic">🕯️</div><div class="grow"><div class="t">${esc(C().title)}: all 10 weeks done</div><div class="s muted">Capstone essay time</div></div></div>`;
+  const core = coreItems(w), done = core.filter(i => itemDone(w, i)).length;
+  const a = C().assignments.find(x => x.week === w.n && asgStatus(x) !== 'assessed' && asgStatus(x) !== 'sent');
+  const behind = calWeek() > w.n;
+  return `<div class="wk tap" data-a="goto" data-v="study" data-s="course"><div class="ic">🕯️</div><div class="grow"><div class="t">Week ${w.n}: ${esc(w.title)}</div>
+    <div class="s muted">${done}/${core.length} done${a ? ` · A${a.n} due ${fmtDate(asgDue(a))} (${esc(a.length)})` : ''} ${behind ? '<span class="pill warn">carry-over</span>' : ''}</div></div></div>`;
+}
+
+function checklist(w) {
+  return `<ul class="list">${w.items.map((it, i) => { const d = itemDone(w, it); const k = KIND[it.kind] || KIND.other; return `
+    <li class="${d ? 'done' : ''}"><button class="check ${d ? 'on' : ''}" data-a="citem" data-w="${w.n}" data-i="${i}" ${it.done ? 'disabled title="Ticked in Obsidian"' : ''}>${d ? ICON_CHECK : ''}</button>
+    <div class="grow"><div class="t small" style="font-size:15px;font-weight:400">${esc(it.text)}</div>${k[0] ? `<span class="pill ${k[1]}" style="margin-top:4px">${k[0]}</span>` : ''}</div></li>`; }).join('')}</ul>`;
+}
+function asgLi(a) {
+  const st = asgStatus(a), tw = targetWords(a), dn = diffDays(asgDue(a), today());
+  return `<li class="tap" data-a="openAsg" data-n="${a.n}"><div class="key">A${a.n}</div><div class="grow"><div class="t clamp2">${esc(a.title)}</div>
+    <div class="s">Week ${a.week} · due ${fmtDate(asgDue(a))} · ${esc(a.length)}${a.draft ? ` · draft ${a.draft.words}${tw ? '/' + tw : ''} words` : ''}</div></div>
+    <span class="pill ${st === 'assessed' ? 'good' : st === 'sent' ? 'good' : dn < 0 ? 'bad' : dn <= 3 ? 'warn' : ''}">${ASG_STATUS.find(s => s[0] === st)[1]}</span></li>`;
+}
 function viewCourse() {
+  const importBtn = `<label class="btn sec block" style="text-align:center;display:grid;place-items:center;margin-top:8px">Import from Files<input type="file" accept="application/json,.json" data-a="importIdeas" hidden></label>`;
+  if (!C()) return `<section class="card"><h2>Esotericism course</h2><div class="empty" style="text-align:left">
+    Your course lives in Obsidian (the <b>esotericism</b> vault). To bring it in:<br><br>
+    1. On your Mac, double-click <b>Sync Obsidian</b> in Desktop › programs.<br><br>
+    2. Tap <b>Import from Files</b> and choose <b>life-admin-sync.json</b> in iCloud Drive › Life Admin.<br><br>
+    That brings in the weekly readings, Latin, assignments and books. Re-sync whenever you change the course or write in Submissions.</div>${importBtn}</section>`;
+  const c = C(), w = focusWeek(), cw = calWeek();
+  const allCore = c.weeks.flatMap(x => coreItems(x).map(i => [x, i]));
+  const pct = allCore.filter(([x, i]) => itemDone(x, i)).length / Math.max(allCore.length, 1) * 100;
+  const behind = w && cw > w.n;
+  const soon = w ? c.books.filter(b => b.weeks.some(n => n >= w.n && n <= w.n + 2) && !b.have && !S.cstate.have[b.text]) : [];
+  const weekAsg = w ? c.assignments.filter(a => a.week === w.n) : [];
+  const capStart = addDays(cWeekStart(c.weeks.length), 7);
   return `
   <section class="card">
-    <h2>Medieval philosophy & mysticism</h2>
-    <p style="margin:0 0 8px">About <b>8 hours a week</b> on top of Plotinus, starting Monday 19 October.</p>
-    <p class="small muted" style="margin:0">Your course plan isn't loaded yet. Once you've built it, send it to Claude and it'll appear here week by week, with this week's target on Today. If you fall behind, the plan shifts forward instead of piling up.</p>
+    <h2>${esc(c.title)}</h2>
+    ${c.question ? `<p style="margin:0 0 8px;font-style:italic">${esc(c.question.charAt(0).toUpperCase() + c.question.slice(1))}</p>` : ''}
+    <div class="small muted">${cw < 1 ? `Starts ${fmtDate(c.start)}` : cw > c.weeks.length ? 'Taught weeks finished' : `Calendar week ${cw} of ${c.weeks.length}`} · about ${c.hours || 6} hrs a week</div>
+    <div class="bar" style="margin-top:10px"><i style="width:${pct}%"></i></div>
   </section>
-  ${S.ideas.some(studyLink) ? `<section class="card"><h2>Essay ideas linked to this study</h2><ul class="list">${S.ideas.filter(studyLink).map(ideaLi).join('')}</ul></section>` : ''}`;
+  ${behind ? `<section class="card" style="border-color:var(--warn)"><div class="t">Week ${w.n} isn't finished yet</div>
+    <p class="small muted" style="margin:4px 0 10px">Rather than doubling up, push the rest of the course (and its due dates) back a week. You can also just finish it alongside week ${cw}.</p>
+    <button class="btn sm block" data-a="shiftPlan" data-v="1">Push the plan back a week</button></section>` : ''}
+  ${w ? `<section class="card">
+    <h2>Week ${w.n} · ${weekRange(w.n)} ${w.note ? `<a class="link" href="${obsLink(w.note)}">Obsidian ↗</a>` : ''}</h2>
+    <div class="t" style="font-size:18px;font-weight:700;margin-bottom:6px">${esc(w.title)}</div>
+    ${w.intro ? `<p class="small" style="margin:0 0 8px;line-height:1.5">${esc(w.intro)}</p>` : ''}
+    ${checklist(w)}
+    ${w.questions.length ? `<details style="margin-top:8px"><summary class="link" style="cursor:pointer">Guiding questions</summary><ol class="small" style="padding-left:20px;line-height:1.5">${w.questions.map(q => `<li style="margin:6px 0">${esc(q)}</li>`).join('')}</ol></details>` : ''}
+    ${weekAsg.length ? `<div class="group-h">Due this week</div><ul class="list">${weekAsg.map(asgLi).join('')}</ul>` : ''}
+    <p class="small muted" style="margin:8px 0 0">Plus about 30 minutes for the reading notebook at the bottom of the week's note.</p>
+  </section>` : `<section class="card"><h2>Capstone essay</h2><p style="margin:0">${esc(c.capstone.length)} over ${esc(c.capstone.when || 'the following weeks')}, from ${fmtDate(capStart)}.</p>
+    ${c.capstone.topics.map((t, i) => `<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">${i + 1}. ${esc(t.title)}</summary><p class="small" style="line-height:1.5">${esc(t.text)}</p></details>`).join('')}</section>`}
+  ${soon.length ? `<section class="card"><h2>Books to get soon</h2><ul class="list">${soon.map(b => `<li><div class="grow"><div class="t small" style="font-size:15px">${esc(b.text)}</div><div class="s">Week ${b.weeks.join(', ')} · ${esc(b.edition)}</div></div>
+    <button class="pill" data-a="haveBook" data-t="${esc(b.text)}">Got it</button></li>`).join('')}</ul></section>` : ''}
+  <section class="card"><h2>Assignments</h2><ul class="list">${c.assignments.map(asgLi).join('')}</ul>
+    <p class="small muted" style="margin:8px 0 0">Draft in Obsidian under Submissions (e.g. "A1 - …"). Word counts update each time you sync.</p></section>
+  <section class="card"><h2>All weeks</h2>
+    ${c.weeks.map(x => { const core = coreItems(x), dn = core.filter(i => itemDone(x, i)).length; return `<details style="border-top:1px solid var(--line);padding:10px 0">
+      <summary style="cursor:pointer;display:flex;gap:10px;align-items:center"><span class="key" style="${weekDone(x) ? '' : 'background:var(--soft);color:var(--muted)'}">${x.n}</span><span class="grow"><span class="t">${esc(x.title)}</span><br><span class="s muted small">${weekRange(x.n)} · ${dn}/${core.length}</span></span></summary>
+      ${checklist(x)}</details>`; }).join('')}
+  </section>
+  ${S.ideas.some(studyLink) ? `<section class="card"><h2>Your essay ideas that connect</h2><ul class="list">${S.ideas.filter(studyLink).map(ideaLi).join('')}</ul></section>` : ''}
+  <p class="small muted">Synced from Obsidian ${S.study.syncAt ? fmtDate(S.study.syncAt.slice(0, 10)).toLowerCase() : ''}. Ticks you make here stay in the app; ticks made in Obsidian show up after a sync.
+  ${S.cstate.offset ? ` Plan pushed back ${S.cstate.offset} week${S.cstate.offset > 1 ? 's' : ''}. <button class="link small" data-a="shiftPlan" data-v="-1">Undo one</button>` : ''}</p>
+  ${importBtn}`;
+}
+function asgForm(a) {
+  const tw = targetWords(a), st = asgStatus(a);
+  const c = C();
+  openSheet(`A${a.n}: ${esc(a.title)}`, `
+    <div class="small muted" style="margin:-8px 0 10px">Due ${fmtDate(asgDue(a))} (end of week ${a.week}) · ${esc(a.length)}</div>
+    <div class="thesis">${esc(a.prompt)}</div>
+    ${a.draft ? `<p class="small" style="margin:0 0 12px">Draft: <b>${a.draft.words}${tw ? ` / ${tw}` : ''} words</b> in "${esc(a.draft.file)}" (edited ${fmtDate(a.draft.modified).toLowerCase()})</p>
+      ${tw ? `<div class="bar" style="margin:-4px 0 12px"><i style="width:${Math.min(100, a.draft.words / tw * 100)}%"></i></div>` : ''}` : '<p class="small muted" style="margin:0 0 12px">No draft found yet in Submissions.</p>'}
+    <label class="f"><span>Status</span></label>
+    <div class="radios" style="margin-top:-8px">${ASG_STATUS.map(([v, l]) => `<label><input type="radio" name="status" value="${v}" ${st === v ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>
+    ${c.criteria.length ? `<details style="margin:0 0 12px"><summary class="link" style="cursor:pointer">How it's assessed</summary><ul class="small" style="padding-left:18px;line-height:1.5">${c.criteria.map(k => `<li><b>${esc(k.name)}:</b> ${esc(k.text)}</li>`).join('')}</ul></details>` : ''}
+    ${a.draft ? `<a class="btn sec" href="${obsLink(a.draft.note)}" style="margin-bottom:8px">Open draft in Obsidian ↗</a>` : c.assignmentsNote ? `<a class="btn sec" href="${obsLink(c.assignmentsNote)}" style="margin-bottom:8px">Open Assignments in Obsidian ↗</a>` : ''}`,
+    f => { S.cstate.asg[a.n] = f.status; });
 }
 
 // essay ideas (imported from Obsidian on the Mac)
@@ -975,7 +1075,7 @@ function viewIdeas() {
   const head = `<div class="row" style="margin:4px 0 8px"><label class="btn sec grow" style="text-align:center;display:grid;place-items:center">Import from Files<input type="file" accept="application/json,.json" data-a="importIdeas" hidden></label></div>`;
   if (!S.ideas.length) return head + `<section class="card"><div class="empty" style="text-align:left">
     <b>How to bring in your essay ideas</b><br><br>
-    1. On your Mac, double-click <b>Sync Essay Ideas</b> in Desktop › programs. It reads your Obsidian vault and saves <b>essay-ideas.json</b> to iCloud Drive › Life Admin.<br><br>
+    1. On your Mac, double-click <b>Sync Obsidian</b> in Desktop › programs. It reads your vaults and saves <b>life-admin-sync.json</b> to iCloud Drive › Life Admin.<br><br>
     2. Tap <b>Import from Files</b> above and choose that file.<br><br>
     Re-run it any time. Your statuses and notes here are kept. To add a new idea later, tag any Obsidian note <b>#essay-idea</b>.</div></section>`;
   const groups = order.map(st => [st, S.ideas.filter(i => i.status === st)]).filter(g => g[1].length);
@@ -995,7 +1095,9 @@ function ideaForm(i) {
     f => { i.status = f.status || 'seed'; i.mine = f.mine.trim(); });
 }
 function importIdeas(d) {
-  if (!d || d.kind !== 'life-admin-essay-ideas' || !Array.isArray(d.ideas)) throw new Error('bad');
+  if (!d || !['life-admin-essay-ideas', 'life-admin-sync'].includes(d.kind) || !Array.isArray(d.ideas)) throw new Error('bad');
+  let courseMsg = '';
+  if (d.course) { S.course = d.course; S.study.syncAt = d.generated; courseMsg = ` · course: ${d.course.weeks.length} weeks`; }
   let added = 0, updated = 0;
   for (const n of d.ideas) {
     const old = S.ideas.find(x => x.key === n.key);
@@ -1003,7 +1105,7 @@ function importIdeas(d) {
     else { S.ideas.push({ ...n, status: 'seed', mine: '' }); added++; }
   }
   S.study.vault = d.vault; S.study.ideasAt = d.generated;
-  return `Imported: ${added} new, ${updated} updated`;
+  return `Imported ${added + updated} essay ideas${courseMsg}`;
 }
 
 const VIEWS = { today: viewToday, money: viewMoney, food: viewFood, study: viewStudy, life: viewLife };
@@ -1256,6 +1358,10 @@ const ACTIONS = {
   chair: el => { const d = el.dataset.d; S.study.chair[d] = !S.study.chair[d]; save(); render(); },
   bgRead: el => { const i = el.dataset.i; S.study.bg[i] = !S.study.bg[i]; save(); render(); },
   openIdea: el => ideaForm(S.ideas.find(i => i.key === el.dataset.id)),
+  citem: el => { const w = C().weeks.find(x => x.n === Number(el.dataset.w)); const it = w.items[Number(el.dataset.i)]; const k = itemKey(w, it); S.cstate.done[k] = !S.cstate.done[k]; save(); render(); if (S.cstate.done[k] && weekDone(w)) toast(`Week ${w.n} done ✓`); },
+  shiftPlan: el => { S.cstate.offset = Math.max(0, (S.cstate.offset || 0) + Number(el.dataset.v)); save(); render(); toast(Number(el.dataset.v) > 0 ? 'Plan pushed back a week' : 'Shift undone'); },
+  haveBook: el => { S.cstate.have[el.dataset.t] = 'yes'; save(); render(); },
+  openAsg: el => asgForm(C().assignments.find(a => a.n === Number(el.dataset.n))),
   closeSheet: closeSheet,
   sheetDel: () => { if (sheetDel && confirm('Delete this?')) { sheetDel(); save(); closeSheet(); render(); } },
   export: async () => {
@@ -1286,7 +1392,7 @@ document.addEventListener('change', e => {
     const r = new FileReader();
     r.onload = () => {
       try { const msg = importIdeas(JSON.parse(r.result)); save(); render(); toast(msg); }
-      catch (err) { toast("That isn't an essay-ideas file from Sync Essay Ideas"); }
+      catch (err) { toast("That isn't a file from Sync Obsidian"); }
     };
     r.readAsText(e.target.files[0]);
     return;
