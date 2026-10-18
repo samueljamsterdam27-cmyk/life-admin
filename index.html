@@ -107,7 +107,7 @@ button.pill { border: 0; min-height: 30px; padding: 4px 12px; }
 .btn.block { width: 100%; }
 .link { background: none; border: 0; color: var(--accent); font-weight: 600; padding: 4px 0; }
 
-.quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 4px 0 12px; }
+.quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 12px; }
 .quick button { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 4px; font-size: 12px; font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 62px; }
 .quick button span.ic { font-size: 20px; line-height: 1; }
 
@@ -168,6 +168,20 @@ nav.tabs button.on { color: var(--accent); }
 .sheet .actions { display: flex; gap: 8px; margin-top: 6px; }
 .sheet .actions .btn { flex: 1; }
 
+.seg.sm button { padding: 6px 4px; font-size: 13px; }
+.wk { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); }
+.wk:first-of-type { border-top: 0; padding-top: 2px; }
+.wk .ic { font-size: 20px; width: 26px; text-align: center; flex: none; }
+.key { flex: none; width: 30px; height: 30px; border-radius: 8px; background: var(--accent-soft); color: var(--good); font-weight: 700; display: grid; place-items: center; font-size: 14px; }
+.clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.thesis { font-size: 15px; line-height: 1.5; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 0 0 12px; }
+.radios { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.radios input { display: none; }
+.radios span { display: inline-block; padding: 7px 12px; border-radius: 999px; background: var(--soft); font-size: 14px; font-weight: 600; color: var(--muted); }
+.radios input:checked + span { background: var(--accent); color: var(--accent-ink); }
+.stage { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+.stage .grow { font-size: 15px; }
+a.btn { display: block; text-align: center; text-decoration: none; }
 .toast { position: fixed; left: 50%; bottom: calc(var(--tabh) + env(safe-area-inset-bottom) + 14px); transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px; font-weight: 500; opacity: 0; transition: all .2s; z-index: 30; pointer-events: none; max-width: calc(100% - 32px); text-align: center; }
 .toast.on { opacity: 1; transform: translateX(-50%); }
 </style>
@@ -179,8 +193,8 @@ nav.tabs button.on { color: var(--accent); }
   <button data-tab="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Today</button>
   <button data-tab="money"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/><path d="M6 10h.01M18 15h.01"/></svg>Money</button>
   <button data-tab="food"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/><circle cx="10" cy="20.5" r="1"/><circle cx="17" cy="20.5" r="1"/></svg>Food</button>
-  <button data-tab="runs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="14" cy="4" r="2"/><path d="M8 21l3-6 3 2v5M6 12l3-4 4 1 3 4 3 1M11 15l-2-3"/></svg>Runs</button>
-  <button data-tab="tasks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6l1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"/></svg>Tasks</button>
+  <button data-tab="study"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5C4.5 4 8 4 12 6c4-2 7.5-2 10-.5V19c-2.5-1.5-6-1.5-10 .5-4-2-7.5-2-10-.5z"/><path d="M12 6v13.5"/></svg>Study</button>
+  <button data-tab="life"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6l1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"/></svg>Life</button>
 </nav>
 
 <div class="scrim" id="scrim"></div>
@@ -208,15 +222,22 @@ const DEFAULTS = () => ({
   runs: [],
   tasks: [],
   chores: [],
+  shifts: [],
+  pieces: [],
+  ideas: [],
+  study: { read: {}, bg: {}, chair: {} },
 });
 
+function merge(d) {
+  const base = DEFAULTS();
+  return { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}) }, study: { ...base.study, ...(d.study || {}) } };
+}
 function load() {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return DEFAULTS();
     const d = JSON.parse(raw);
-    const base = DEFAULTS();
-    return { ...base, ...d, settings: { ...base.settings, ...(d.settings || {}) } };
+    return merge(d);
   } catch (e) {
     return DEFAULTS();
   }
@@ -313,12 +334,17 @@ function runAutopay() {
 }
 
 // ---------- state / routing ----------
-const ui = { tab: 'today', moneySeg: 'spend', foodSeg: 'list', taskSeg: 'todo', month: monthKey(today()), showDone: false };
+const ui = { tab: 'today', moneySeg: 'spend', foodSeg: 'list', taskSeg: 'todo', studySeg: 'plotinus', lifeSeg: 'runs', month: monthKey(today()), showDone: false, showPast: false };
 try { Object.assign(ui, JSON.parse(sessionStorage.getItem('la.ui') || '{}'), { month: monthKey(today()) }); } catch (e) {}
 
-function go(tab) { ui.tab = tab; render(); window.scrollTo(0, 0); }
+function go(tab, segKey, segVal) {
+  if (tab === 'runs' || tab === 'tasks') { segKey = 'lifeSeg'; segVal = tab; tab = 'life'; }
+  if (segKey) ui[segKey] = segVal;
+  ui.tab = tab; render(); window.scrollTo(0, 0);
+}
 function render() {
-  try { sessionStorage.setItem('la.ui', JSON.stringify({ tab: ui.tab, moneySeg: ui.moneySeg, foodSeg: ui.foodSeg, taskSeg: ui.taskSeg })); } catch (e) {}
+  if (!VIEWS[ui.tab]) ui.tab = 'today';
+  try { sessionStorage.setItem('la.ui', JSON.stringify({ tab: ui.tab, moneySeg: ui.moneySeg, foodSeg: ui.foodSeg, taskSeg: ui.taskSeg, studySeg: ui.studySeg, lifeSeg: ui.lifeSeg })); } catch (e) {}
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === ui.tab));
   $('#app').innerHTML = VIEWS[ui.tab]();
 }
@@ -326,10 +352,36 @@ function render() {
 function header(title, sub, right = '') {
   return `<header class="top"><div><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div>${right}</header>`;
 }
-const seg = (key, opts) => `<div class="seg">${opts.map(([v, l]) => `<button data-a="seg" data-k="${key}" data-v="${v}" class="${ui[key] === v ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+const seg = (key, opts, cls = '') => `<div class="seg ${cls}">${opts.map(([v, l]) => `<button data-a="seg" data-k="${key}" data-v="${v}" class="${ui[key] === v ? 'on' : ''}">${l}</button>`).join('')}</div>`;
 
 // ---------- TODAY ----------
 function choreDue(c) { return c.last ? addDays(c.last, c.every) : today(); }
+
+function weekCard() {
+  const rows = [];
+  const sh = upcomingShifts()[0];
+  if (sh) {
+    const wkHours = shiftsInWeek(weekStart(today())).reduce((a, s) => a + shiftHours(s), 0);
+    rows.push(`<div class="wk tap" data-a="goto" data-v="life" data-s="shifts"><div class="ic">☕</div><div class="grow"><div class="t">Next shift: ${fmtDate(sh.date)} · ${sh.start}–${sh.end}</div>
+      <div class="s muted">${wkHours ? `${fmtHours(wkHours)} this week` : ''}${clashText(sh) ? ` <span class="pill bad">${clashText(sh)}</span>` : ''}</div></div></div>`);
+  }
+  const ses = nextSession();
+  if (ses) {
+    const read = S.study.read[ses.date];
+    rows.push(`<div class="wk"><div class="ic">📜</div><div class="grow tap" data-a="goto" data-v="study" data-s="plotinus"><div class="t">Plotinus ${fmtDate(ses.date).toLowerCase() === 'today' ? 'today' : fmtDate(ses.date)}: ${ses.label}</div>
+      <div class="s muted">${PLOTINUS.text}${S.study.chair[ses.date] ? ' · <b>you\'re chairing</b>' : ''}</div></div>
+      ${ses.label === 'Catch-up' ? '' : `<button class="check ${read ? 'on' : ''}" data-a="readCh" data-d="${ses.date}" aria-label="Mark read">${read ? ICON_CHECK : ''}</button>`}</div>`);
+  }
+  rows.push(`<div class="wk tap" data-a="goto" data-v="study" data-s="course"><div class="ic">🕯️</div><div class="grow"><div class="t">Medieval philosophy & mysticism</div><div class="s muted">About 8 hrs this week · your course plan arrives soon</div></div></div>`);
+  const pieces = S.pieces.filter(p => curStage(p));
+  if (pieces.length) {
+    const p = [...pieces].sort((a, b) => pieceUrgency(b) - pieceUrgency(a))[0];
+    const st = curStage(p), fl = pieceFlags(p);
+    rows.push(`<div class="wk tap" data-a="goto" data-v="life" data-s="piano"><div class="ic">🎹</div><div class="grow"><div class="t">${esc(p.title)}: ${st.name.toLowerCase()}</div>
+      <div class="s muted">Stage due ${fmtDate(st.due).toLowerCase()}${pieces.length > 1 ? ` · +${pieces.length - 1} more piece${pieces.length > 2 ? 's' : ''}` : ''} ${fl.map(f => `<span class="pill ${f.c}">${f.t}</span>`).join(' ')}</div></div></div>`);
+  }
+  return `<section class="card"><h2>This week</h2>${rows.join('')}</section>`;
+}
 
 function viewToday() {
   const t = today();
@@ -381,7 +433,11 @@ function viewToday() {
     <button data-a="addRun"><span class="ic">🏃</span>Run</button>
     <button data-a="quickGrocery"><span class="ic">🛒</span>Grocery</button>
     <button data-a="addTask"><span class="ic">✅</span>To-do</button>
+    <button data-a="addShift"><span class="ic">☕</span>Shift</button>
+    <button data-a="logPractice"><span class="ic">🎹</span>Practice</button>
   </div>
+
+  ${weekCard()}
 
   <section class="card">
     <h2>Needs attention</h2>
@@ -561,7 +617,7 @@ function viewRuns() {
   const longest = runs.reduce((a, r) => !a || r.dist > a.dist ? r : a, null);
   const fastest = runs.filter(r => r.dist >= 1).reduce((a, r) => !a || r.secs / r.dist < a.secs / a.dist ? r : a, null);
 
-  return `${header('Runs', '')}
+  return `
   <section class="card">
     <div class="stats">
       <div class="stat"><div class="v">${fmtDist(sum(wk))}</div><div class="l">this week · ${wk.length} run${wk.length === 1 ? '' : 's'}</div></div>
@@ -584,7 +640,7 @@ function viewRuns() {
 
 // ---------- TASKS ----------
 function viewTasks() {
-  return header('Tasks', '') + seg('taskSeg', [['todo', 'To-dos'], ['chores', 'Chores']]) + (ui.taskSeg === 'todo' ? viewTodos() : viewChores());
+  return seg('taskSeg', [['todo', 'To-dos'], ['chores', 'Chores']], 'sm') + (ui.taskSeg === 'todo' ? viewTodos() : viewChores());
 }
 function viewTodos() {
   const open = S.tasks.filter(x => !x.done).sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || a.id.localeCompare(b.id));
@@ -617,7 +673,340 @@ function viewChores() {
   </section>`;
 }
 
-const VIEWS = { today: viewToday, money: viewMoney, food: viewFood, runs: viewRuns, tasks: viewTasks };
+// ---------- LIFE (runs, piano, shifts, tasks) ----------
+function viewLife() {
+  const sub = { runs: viewRuns, piano: viewPiano, shifts: viewShifts, tasks: viewTasks }[ui.lifeSeg] || viewRuns;
+  return header('Life', '') + seg('lifeSeg', [['runs', 'Runs'], ['piano', 'Piano'], ['shifts', 'Shifts'], ['tasks', 'Tasks']]) + sub();
+}
+
+// shifts
+const toMin = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+function shiftHours(s) { let d = toMin(s.end) - toMin(s.start); if (d <= 0) d += 1440; return d / 60; }
+const fmtHours = h => `${Math.round(h * 10) / 10} hr${h === 1 ? '' : 's'}`;
+function shiftEnded(s) { const t = today(); if (s.date !== t) return s.date < t; const n = new Date(); return n.getHours() * 60 + n.getMinutes() >= toMin(s.end) && toMin(s.end) > toMin(s.start); }
+const upcomingShifts = () => S.shifts.filter(s => !shiftEnded(s)).sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
+const shiftsInWeek = ws => S.shifts.filter(s => s.date >= ws && s.date <= addDays(ws, 6));
+function clashText(s) {
+  const ses = PLOTINUS.sessions.find(x => x.date === s.date);
+  const overlap = (a1, a2, b1, b2) => a1 < b2 && b1 < a2;
+  const end = toMin(s.end) <= toMin(s.start) ? toMin(s.end) + 1440 : toMin(s.end);
+  if (ses && overlap(toMin(s.start), end, 660, 780)) return 'Clashes with Plotinus';
+  const other = S.shifts.find(o => o !== s && o.date === s.date && overlap(toMin(s.start), end, toMin(o.start), toMin(o.end) <= toMin(o.start) ? toMin(o.end) + 1440 : toMin(o.end)));
+  return other ? 'Overlaps another shift' : '';
+}
+function viewShifts() {
+  const ws = weekStart(today()), nws = addDays(ws, 7);
+  const thisH = shiftsInWeek(ws).reduce((a, s) => a + shiftHours(s), 0);
+  const nextH = shiftsInWeek(nws).reduce((a, s) => a + shiftHours(s), 0);
+  const up = upcomingShifts();
+  const past = S.shifts.filter(shiftEnded).sort((a, b) => (b.date + b.start).localeCompare(a.date + a.start)).slice(0, 10);
+  const li = s => { const c = clashText(s); return `<li class="tap" data-a="editShift" data-id="${s.id}"><div class="grow"><div class="t">${fmtDate(s.date)} · ${s.start}–${s.end}</div>
+    <div class="s">${fmtHours(shiftHours(s))}${s.note ? ' · ' + esc(s.note) : ''}</div></div>${c ? `<span class="pill bad">${c}</span>` : ''}</li>`; };
+  const grp = (label, arr) => arr.length ? `<div class="group-h">${label}</div><ul class="list">${arr.map(li).join('')}</ul>` : '';
+  return `
+  <section class="card"><div class="stats" style="grid-template-columns:1fr 1fr">
+    <div class="stat"><div class="v">${fmtHours(thisH)}</div><div class="l">this week</div></div>
+    <div class="stat"><div class="v">${fmtHours(nextH)}</div><div class="l">next week</div></div></div></section>
+  <div class="row"><button class="btn grow" data-a="pasteShifts">Paste boss's text</button><button class="btn sec" data-a="addShift">+ Add</button></div>
+  <section class="card">
+    ${up.length ? grp('This week', up.filter(s => s.date < nws)) + grp('Next week', up.filter(s => s.date >= nws && s.date < addDays(nws, 7))) + grp('Later', up.filter(s => s.date >= addDays(nws, 7)))
+      : '<div class="empty">No shifts coming up. When your boss texts the rota, copy the message and tap <b>Paste boss\'s text</b>.</div>'}
+  </section>
+  ${past.length ? `<button class="link" data-a="togglePast">${ui.showPast ? 'Hide' : 'Show'} past shifts</button>${ui.showPast ? `<section class="card"><ul class="list">${past.map(li).join('')}</ul></section>` : ''}` : ''}`;
+}
+
+// Turn a text like "Tue 12-5, Sat 9-3" or "Thursday 17:00-23:00" into shifts.
+const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+function parseShifts(text) {
+  const out = [];
+  const t0 = today();
+  const segs = text.split(/\n|;|,(?!\d)|\band\b|\s\/\s/i);
+  let lastDate = null;
+  for (const raw of segs) {
+    const sgm = raw.toLowerCase();
+    let date = null;
+    let m = sgm.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s*(?:of\s*)?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*/) || null;
+    if (m) date = pickYear(Number(m[1]), MONTHS.indexOf(m[2]));
+    if (!date && (m = sgm.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*(\d{1,2})\b/))) date = pickYear(Number(m[2]), MONTHS.indexOf(m[1]));
+    if (!date && (m = sgm.match(/\b(\d{1,2})[\/.](\d{1,2})\b(?!\s*(?:am|pm|:))/))) date = pickYear(Number(m[1]), Number(m[2]) - 1);
+    if (!date && (m = sgm.match(/\b(sun|mon|tue|wed|thu|fri|sat)[a-z]*\b/))) {
+      const want = DAYS.indexOf(m[1]); const d = parse(t0); let n = (want - d.getDay() + 7) % 7;
+      date = addDays(t0, n);
+    }
+    if (!date && /\b(today|tonight)\b/.test(sgm)) date = t0;
+    if (!date && /\btomorrow\b/.test(sgm)) date = addDays(t0, 1);
+    const tm = sgm.match(/(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)?\s*(?:-|–|—|to|till|until)\s*(\d{1,2}|close)(?:[:.](\d{2}))?\s*(am|pm)?/);
+    if (!date && tm && lastDate) date = lastDate;
+    if (!date || !tm) continue;
+    lastDate = date;
+    let sh = Number(tm[1]), sm = Number(tm[2] || 0);
+    let eh = tm[4] === 'close' ? null : Number(tm[4]), em = Number(tm[5] || 0);
+    const sap = tm[3] || (tm[6] && !tm[3] && eh !== null && Number(tm[1]) < eh ? tm[6] : null);
+    if (sap === 'pm' && sh < 12) sh += 12; else if (sap === 'am' && sh === 12) sh = 0;
+    else if (!sap && sh < 7) sh += 12;
+    if (eh === null) { eh = Math.min(sh + 6, 23); em = 0; }
+    else if (tm[6] === 'pm' && eh < 12) eh += 12;
+    else if (!tm[6] && eh * 60 + em <= sh * 60 + sm && eh < 12) eh += 12;
+    const hhmm = (h, mi) => `${pad(h % 24)}:${pad(mi)}`;
+    out.push({ date, start: hhmm(sh, sm), end: hhmm(eh, em) });
+  }
+  return out.filter((s, i) => out.findIndex(o => o.date === s.date && o.start === s.start) === i);
+}
+function pickYear(day, month) {
+  if (month < 0 || month > 11 || day < 1 || day > 31) return null;
+  const now = new Date(); let y = now.getFullYear();
+  let d = new Date(y, month, day);
+  if (diffDays(iso(d), today()) < -60) d = new Date(y + 1, month, day);
+  return iso(d);
+}
+
+function shiftForm(s) {
+  const isNew = !s;
+  s = s || { date: today(), start: '09:00', end: '15:00', note: '' };
+  openSheet(isNew ? 'Add shift' : 'Edit shift', `
+    <label class="f"><span>Date</span><input name="date" type="date" value="${s.date}" required></label>
+    <div class="f2"><label class="f"><span>Start</span><input name="start" type="time" value="${s.start}" required></label>
+    <label class="f"><span>End</span><input name="end" type="time" value="${s.end}" required></label></div>
+    <label class="f"><span>Note</span><input name="note" value="${esc(s.note)}" placeholder="e.g. covering for Jess"></label>`,
+    f => {
+      const data = { date: f.date, start: f.start, end: f.end, note: f.note.trim() };
+      if (isNew) {
+        if (S.shifts.some(x => x.date === data.date && x.start === data.start)) { toast('That shift is already in'); return false; }
+        S.shifts.push({ id: uid(), ...data });
+      } else Object.assign(s, data);
+      const c = clashText(isNew ? S.shifts.at(-1) : s); toast(c ? `Saved. Heads up: ${c.toLowerCase()}` : 'Shift saved');
+    }, { del: isNew ? null : () => { S.shifts = S.shifts.filter(x => x !== s); } });
+}
+function pasteShiftsForm() {
+  openSheet('Paste the rota text', `
+    <p class="small muted" style="margin-top:-6px">Copy your boss's message and paste it here. For example: <i>"Tue 12-5, Sat 9-3"</i> or <i>"Thursday 23rd 17:00–23:00"</i>.</p>
+    <label class="f"><textarea name="txt" rows="4" placeholder="Paste message…" autofocus></textarea></label>
+    <div id="found"></div>`,
+    f => {
+      const found = parseShifts(f.txt || '');
+      const picks = f._form.querySelectorAll('[name=pick]:checked');
+      let n = 0;
+      picks.forEach(p => {
+        const s = found[Number(p.value)];
+        if (s && !S.shifts.some(x => x.date === s.date && x.start === s.start)) { S.shifts.push({ id: uid(), ...s, note: '' }); n++; }
+      });
+      if (!n) { toast('No new shifts to add'); return false; }
+      toast(`Added ${n} shift${n === 1 ? '' : 's'}`);
+      ui.lifeSeg = 'shifts';
+    }, { ok: 'Add shifts' });
+  const upd = () => {
+    const found = parseShifts($('#sheetForm [name=txt]').value);
+    $('#found').innerHTML = found.length ? `<div class="group-h">Found ${found.length} shift${found.length === 1 ? '' : 's'}: untick any that are wrong</div>
+      ${found.map((s, i) => { const dup = S.shifts.some(x => x.date === s.date && x.start === s.start); return `<label class="chk"><input type="checkbox" name="pick" value="${i}" ${dup ? 'disabled' : 'checked'}>
+      ${parse(s.date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })} · ${s.start}–${s.end}${dup ? ' <span class="pill">already added</span>' : ''}</label>`; }).join('')}
+      <p class="small muted">You can fix times afterwards by tapping a shift.</p>`
+      : (($('#sheetForm [name=txt]').value.trim()) ? '<p class="small muted">No shifts found yet. Each shift needs a day and a time range like 12-5.</p>' : '');
+  };
+  $('#sheetForm').addEventListener('input', upd);
+}
+
+// piano
+const STAGES = [['Learn notes, section by section', 0.4], ['Hands together', 0.25], ['Up to tempo', 0.2], ['Memorised & polished', 0.15]];
+function planStages(from, to, names) {
+  const span = Math.max(diffDays(to, from), names.length);
+  const total = names.reduce((a, n) => a + STAGES.find(s => s[0] === n)[1], 0);
+  let acc = 0;
+  return names.map((n, i) => { acc += STAGES.find(s => s[0] === n)[1]; return { name: n, due: i === names.length - 1 ? to : addDays(from, Math.round(span * acc / total)), done: false }; });
+}
+const curStage = p => p.stages.find(s => !s.done);
+const lastPractice = p => p.log.length ? p.log.reduce((a, l) => l.date > a ? l.date : a, '') : null;
+function pieceFlags(p) {
+  const st = curStage(p); const f = [];
+  if (!st) return f;
+  if (st.due < today()) f.push({ t: 'Behind', c: 'bad' });
+  const lp = lastPractice(p) || p.start;
+  const gap = diffDays(today(), lp);
+  if (gap >= 7) f.push({ t: lastPractice(p) ? `No practice in ${gap} days` : 'Not started', c: 'warn' });
+  return f;
+}
+const pieceUrgency = p => { const st = curStage(p); return st ? -diffDays(st.due, today()) + (pieceFlags(p).length * 5) : -999; };
+function viewPiano() {
+  const active = S.pieces.filter(p => curStage(p)).sort((a, b) => pieceUrgency(b) - pieceUrgency(a));
+  const learned = S.pieces.filter(p => !curStage(p));
+  const wkMins = S.pieces.flatMap(p => p.log).filter(l => l.date >= weekStart(today())).reduce((a, l) => a + (l.mins || 0), 0);
+  const card = p => {
+    const st = curStage(p), done = p.stages.filter(s => s.done).length, lp = lastPractice(p);
+    return `<li class="tap" data-a="editPiece" data-id="${p.id}" style="flex-direction:column;align-items:stretch;gap:6px">
+      <div class="row"><div class="grow"><div class="t">${esc(p.title)}</div><div class="s">${esc(p.composer || '')}${p.composer ? ' · ' : ''}target ${fmtDate(p.target)}</div></div>
+      <button class="btn sm sec" data-a="logPractice" data-id="${p.id}">Practised</button></div>
+      ${st ? `<div class="small">Now: <b>${st.name}</b> · ${dueLabel(st.due).t.replace('Due today', 'due today').toLowerCase()}</div>` : ''}
+      <div class="bar"><i style="width:${done / p.stages.length * 100}%"></i></div>
+      <div class="row small muted" style="gap:6px;flex-wrap:wrap">${lp ? `Last practised ${fmtDate(lp).toLowerCase()}` : 'No practice logged yet'} ${pieceFlags(p).map(f => `<span class="pill ${f.c}">${f.t}</span>`).join('')}</div></li>`;
+  };
+  return `
+  ${S.pieces.length ? `<section class="card"><div class="stats" style="grid-template-columns:1fr 1fr">
+    <div class="stat"><div class="v">${active.length}</div><div class="l">pieces in progress</div></div>
+    <div class="stat"><div class="v">${wkMins} min</div><div class="l">practice this week</div></div></div></section>` : ''}
+  <button class="btn block" data-a="addPiece">+ Add a piece to learn</button>
+  <section class="card">${active.length ? `<ul class="list">${active.map(card).join('')}</ul>` : '<div class="empty">Add a piece and a date you want to know it by. The app splits it into stages with deadlines and tells you what to work on each week.</div>'}</section>
+  ${learned.length ? `<section class="card"><h2>Learned 🎉</h2><ul class="list">${learned.map(p => `<li class="tap" data-a="editPiece" data-id="${p.id}"><div class="grow"><div class="t">${esc(p.title)}</div><div class="s">${esc(p.composer || '')}</div></div></li>`).join('')}</ul></section>` : ''}`;
+}
+function pieceForm(p) {
+  const isNew = !p;
+  const d = p || { title: '', composer: '', start: today(), target: addDays(today(), 56), notes: '' };
+  openSheet(isNew ? 'New piece' : esc(d.title), `
+    <label class="f"><span>Piece</span><input name="title" value="${esc(d.title)}" required placeholder="e.g. Chopin Nocturne Op. 9 No. 2" ${isNew ? 'autofocus' : ''}></label>
+    <label class="f"><span>Composer</span><input name="composer" value="${esc(d.composer)}"></label>
+    <div class="f2"><label class="f"><span>Started</span><input name="start" type="date" value="${d.start}" required></label>
+    <label class="f"><span>Learned by</span><input name="target" type="date" value="${d.target}" required></label></div>
+    ${isNew ? `<div class="row" style="gap:6px;margin:-6px 0 12px;flex-wrap:wrap">${[[4, '4 weeks'], [8, '8 weeks'], [12, '3 months'], [26, '6 months']].map(([w, l]) => `<button type="button" class="pill" data-a="setTarget" data-v="${w}">${l}</button>`).join('')}</div>
+      <p class="small muted">It gets split into 4 stages: ${STAGES.map(s => s[0].toLowerCase()).join(' → ')}.</p>`
+    : `<div class="group-h" style="margin-top:0">Stages: tick when done</div>
+      ${p.stages.map((s, i) => `<label class="stage"><input type="checkbox" name="st${i}" ${s.done ? 'checked' : ''} style="width:22px;height:22px;accent-color:var(--accent)"><span class="grow">${s.name}</span><span class="pill ${s.done ? 'good' : s.due < today() ? 'bad' : ''}">${s.done ? 'Done' : fmtDate(s.due)}</span></label>`).join('')}
+      <p class="small muted">Changing the "learned by" date re-spaces the unfinished stages from today.</p>
+      ${p.log.length ? `<div class="group-h">Practice log</div><ul class="list small">${[...p.log].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8).map(l => `<li style="min-height:36px;padding:6px 0"><span class="grow">${fmtDate(l.date)}${l.note ? ' · ' + esc(l.note) : ''}</span><span class="muted">${l.mins ? l.mins + ' min' : ''}</span></li>`).join('')}</ul>` : ''}`}
+    <label class="f"><span>Notes</span><textarea name="notes" placeholder="Tricky bars, fingering, tempo goal…">${esc(d.notes || '')}</textarea></label>`,
+    f => {
+      if (f.target <= f.start) { toast('"Learned by" must be after the start'); return false; }
+      if (isNew) {
+        S.pieces.push({ id: uid(), title: f.title.trim(), composer: f.composer.trim(), start: f.start, target: f.target, notes: f.notes.trim(), stages: planStages(f.start, f.target, STAGES.map(s => s[0])), log: [] });
+        ui.lifeSeg = 'piano'; toast('Piece added with a stage plan');
+      } else {
+        p.stages.forEach((s, i) => s.done = !!f['st' + i]);
+        const retarget = f.target !== p.target;
+        Object.assign(p, { title: f.title.trim(), composer: f.composer.trim(), start: f.start, target: f.target, notes: f.notes.trim() });
+        if (retarget) {
+          const open = p.stages.filter(s => !s.done);
+          const from = today() > p.start ? today() : p.start;
+          if (open.length) planStages(from, p.target, open.map(s => s.name)).forEach((n, i) => open[i].due = n.due);
+          toast('Stages re-spaced to the new date');
+        }
+        if (!curStage(p)) toast(`${p.title} learned! 🎉`);
+      }
+    }, { del: isNew ? null : () => { S.pieces = S.pieces.filter(x => x !== p); } });
+}
+function practiceForm(pid) {
+  const active = S.pieces.filter(p => curStage(p));
+  if (!active.length) { ui.lifeSeg = 'piano'; go('life'); toast('Add a piece first'); return; }
+  openSheet('Log practice', `
+    <label class="f"><span>Piece</span><select name="pid">${active.map(p => `<option value="${p.id}" ${p.id === pid ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}</select></label>
+    <label class="f"><span>Minutes</span><input name="mins" type="number" inputmode="numeric" min="0" placeholder="e.g. 30"></label>
+    <div class="row" style="gap:6px;margin:-6px 0 12px">${[15, 30, 45, 60].map(m => `<button type="button" class="pill" data-a="setMins" data-v="${m}">${m}</button>`).join('')}</div>
+    <label class="f"><span>What you worked on</span><input name="note" placeholder="e.g. bars 17–32 hands together"></label>
+    <label class="chk"><input type="checkbox" name="stageDone"> I finished the current stage</label>`,
+    f => {
+      const p = byId(S.pieces, f.pid);
+      p.log.push({ date: today(), mins: parseInt(f.mins) || 0, note: f.note.trim() });
+      if (f.stageDone) { const st = curStage(p); st.done = true; const nx = curStage(p); toast(nx ? `Next stage: ${nx.name.toLowerCase()}` : `${p.title} learned! 🎉`); }
+      else toast('Practice logged');
+    }, { ok: 'Log' });
+}
+
+// ---------- STUDY ----------
+const PLOTINUS = {
+  text: 'Ennead III.1, On Destiny',
+  trans: 'Armstrong translation (Loeb, Plotinus vol. III)',
+  where: '40 George Square, room 9.14',
+  time: 'Fridays 11:00–13:00',
+  sessions: [
+    ['2026-10-02', 'Chapter 1', 'Damian'], ['2026-10-09', 'Chapter 2'], ['2026-10-16', 'Chapter 3'], ['2026-10-23', 'Chapter 4'],
+    ['2026-10-30', 'Chapter 5'], ['2026-11-06', 'Chapter 6'], ['2026-11-13', 'Chapter 7'], ['2026-11-20', 'Chapter 8'],
+    ['2026-11-27', 'Chapters 9 and 10'], ['2026-12-04', 'Catch-up'],
+  ].map(([date, label, chair]) => ({ date, label, chair })),
+  background: [
+    ["O'Keefe, 'Ancient Theories of Freedom and Determinism' (Stanford Encyclopedia of Philosophy)", 'https://plato.stanford.edu/entries/freedom-ancient/'],
+    ['Bobzien, Determinism and Freedom in Stoic Philosophy'],
+    ['Coope, Freedom and Responsibility in Neoplatonist Thought'],
+    ['Frede, A Free Will: Origins of the Notion in Ancient Thought'],
+    ['Emilsson, Plotinus'],
+    ["O'Meara, Plotinus: An Introduction to the Enneads"],
+  ],
+};
+function nextSession() {
+  const t = today(), h = new Date().getHours();
+  return PLOTINUS.sessions.find(s => s.date > t || (s.date === t && h < 13));
+}
+function viewStudy() {
+  const sub = { plotinus: viewPlotinus, course: viewCourse, ideas: viewIdeas }[ui.studySeg] || viewPlotinus;
+  return header('Study', '') + seg('studySeg', [['plotinus', 'Plotinus'], ['course', 'Medieval'], ['ideas', `Essay ideas${S.ideas.length ? ` (${S.ideas.length})` : ''}`]]) + sub();
+}
+function viewPlotinus() {
+  const nx = nextSession();
+  const chapters = PLOTINUS.sessions.filter(s => s.label !== 'Catch-up');
+  const nRead = chapters.filter(s => S.study.read[s.date]).length;
+  const nBg = PLOTINUS.background.filter((_, i) => S.study.bg[i]).length;
+  return `
+  <section class="card">
+    <h2>Reading group</h2>
+    <div class="t" style="font-size:18px;font-weight:700">${PLOTINUS.text}</div>
+    <div class="small muted">${PLOTINUS.trans}<br>${PLOTINUS.time} · ${PLOTINUS.where}</div>
+    ${nx ? `<div class="thesis" style="margin:12px 0 0"><b>${fmtDate(nx.date) === 'Today' ? 'Today' : 'This ' + (diffDays(nx.date, today()) < 7 ? parse(nx.date).toLocaleDateString(undefined, { weekday: 'long' }) : fmtDate(nx.date))}:</b> prepare <b>${nx.label.toLowerCase()}</b>${S.study.read[nx.date] ? ' ✓ read' : ''}${S.study.chair[nx.date] ? '<br>You\'re chairing: structure the text, read the passage and kick off discussion.' : ''}</div>` : '<p class="muted">The semester\'s sessions are finished.</p>'}
+    <div class="bar" style="margin-top:12px"><i style="width:${nRead / chapters.length * 100}%"></i></div>
+    <div class="small muted" style="margin-top:4px">${nRead} of ${chapters.length} sessions read</div>
+  </section>
+  <section class="card"><h2>Schedule</h2><ul class="list">
+    ${PLOTINUS.sessions.map(s => { const past = s.date < today(); const isNext = nx && s.date === nx.date; const read = S.study.read[s.date]; return `
+      <li style="${past && !isNext ? 'opacity:.6' : ''}">${s.label === 'Catch-up' ? '<div style="width:26px"></div>' : `<button class="check ${read ? 'on' : ''}" data-a="readCh" data-d="${s.date}">${read ? ICON_CHECK : ''}</button>`}
+      <div class="grow"><div class="t">${s.label}${isNext ? ' <span class="pill warn">next</span>' : ''}</div><div class="s">${parse(s.date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}${s.chair ? ' · chair: ' + s.chair : ''}</div></div>
+      ${s.label === 'Catch-up' || past ? (S.study.chair[s.date] ? '<span class="pill good">chaired</span>' : '') : `<button class="pill ${S.study.chair[s.date] ? 'good' : ''}" data-a="chair" data-d="${s.date}">${S.study.chair[s.date] ? 'Chairing ✓' : 'Chair?'}</button>`}</li>`; }).join('')}
+  </ul></section>
+  <section class="card"><h2>Background reading <span class="small muted" style="text-transform:none;letter-spacing:0">${nBg}/${PLOTINUS.background.length}</span></h2><ul class="list">
+    ${PLOTINUS.background.map(([t, url], i) => `<li><button class="check ${S.study.bg[i] ? 'on' : ''}" data-a="bgRead" data-i="${i}">${S.study.bg[i] ? ICON_CHECK : ''}</button>
+      <div class="grow small">${esc(t)}${url ? ` <a href="${url}" target="_blank" rel="noopener" style="color:var(--accent)">open ↗</a>` : ''}</div></li>`).join('')}
+  </ul><p class="small muted" style="margin:8px 0 0">Optional. Emilsson or O'Meara for Plotinus in general; the rest on fate and freedom.</p></section>`;
+}
+function viewCourse() {
+  return `
+  <section class="card">
+    <h2>Medieval philosophy & mysticism</h2>
+    <p style="margin:0 0 8px">About <b>8 hours a week</b> on top of Plotinus, starting Monday 19 October.</p>
+    <p class="small muted" style="margin:0">Your course plan isn't loaded yet. Once you've built it, send it to Claude and it'll appear here week by week, with this week's target on Today. If you fall behind, the plan shifts forward instead of piling up.</p>
+  </section>
+  ${S.ideas.some(studyLink) ? `<section class="card"><h2>Essay ideas linked to this study</h2><ul class="list">${S.ideas.filter(studyLink).map(ideaLi).join('')}</ul></section>` : ''}`;
+}
+
+// essay ideas (imported from Obsidian on the Mac)
+const IDEA_STATUS = [['seed', 'Seed'], ['developing', 'Developing'], ['drafting', 'Drafting'], ['written', 'Written'], ['shelved', 'Shelved']];
+const studyLink = i => /plotinus|neoplaton|proclus|emanation|kabbal|zohar|avicenna|ghazali|mystic|esoteric|hermetic|dionysius|eckhart|occasionalism/i.test(i.title + ' ' + (i.thesis || ''));
+function ideaLi(i) {
+  const st = IDEA_STATUS.find(s => s[0] === i.status);
+  return `<li class="tap" data-a="openIdea" data-id="${esc(i.key)}"><div class="key">${esc(i.label || '•')}</div>
+    <div class="grow"><div class="t clamp2">${esc(i.title)}</div><div class="s ellipsis">${esc(i.cluster || i.source || '')}</div></div>
+    <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">${st && i.status !== 'seed' ? `<span class="pill ${i.status === 'drafting' ? 'warn' : i.status === 'written' ? 'good' : ''}">${st[1]}</span>` : ''}${studyLink(i) ? '<span class="pill good">study</span>' : ''}</div></li>`;
+}
+function viewIdeas() {
+  const order = ['drafting', 'developing', 'seed', 'written', 'shelved'];
+  const head = `<div class="row" style="margin:4px 0 8px"><label class="btn sec grow" style="text-align:center;display:grid;place-items:center">Import from Files<input type="file" accept="application/json,.json" data-a="importIdeas" hidden></label></div>`;
+  if (!S.ideas.length) return head + `<section class="card"><div class="empty" style="text-align:left">
+    <b>How to bring in your essay ideas</b><br><br>
+    1. On your Mac, double-click <b>Sync Essay Ideas</b> in Desktop › programs. It reads your Obsidian vault and saves <b>essay-ideas.json</b> to iCloud Drive › Life Admin.<br><br>
+    2. Tap <b>Import from Files</b> above and choose that file.<br><br>
+    Re-run it any time. Your statuses and notes here are kept. To add a new idea later, tag any Obsidian note <b>#essay-idea</b>.</div></section>`;
+  const groups = order.map(st => [st, S.ideas.filter(i => i.status === st)]).filter(g => g[1].length);
+  return head + `<p class="small muted" style="margin:0 0 4px">${S.ideas.length} ideas${S.study.ideasAt ? ` · synced ${fmtDate(S.study.ideasAt.slice(0, 10)).toLowerCase()}` : ''}. Tap one to set its status or add notes.</p>
+  <section class="card">${groups.map(([st, arr]) => `<div class="group-h">${IDEA_STATUS.find(s => s[0] === st)[1]}</div><ul class="list">${arr.map(ideaLi).join('')}</ul>`).join('')}</section>`;
+}
+function ideaForm(i) {
+  const link = S.study.vault && i.note ? `obsidian://open?vault=${encodeURIComponent(S.study.vault)}&file=${encodeURIComponent(i.note.replace(/\.md$/, ''))}` : '';
+  openSheet(esc(i.title), `
+    <div class="small muted" style="margin:-8px 0 10px">${esc(i.cluster || '')}${i.vaultStatus ? ' · ' + esc(i.vaultStatus) : ''}</div>
+    ${i.thesis ? `<div class="thesis">${esc(i.thesis)}</div>` : ''}
+    ${studyLink(i) ? '<p class="small" style="color:var(--good);margin:0 0 12px">Connects to your Plotinus / medieval mysticism study.</p>' : ''}
+    <label class="f"><span>Status</span></label>
+    <div class="radios" style="margin-top:-8px">${IDEA_STATUS.map(([v, l]) => `<label><input type="radio" name="status" value="${v}" ${i.status === v ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>
+    <label class="f"><span>My notes</span><textarea name="mine" placeholder="Next step, sources to find, where this could go…">${esc(i.mine || '')}</textarea></label>
+    ${link ? `<a class="btn sec" href="${link}" style="margin-bottom:12px">Open note in Obsidian ↗</a>` : ''}`,
+    f => { i.status = f.status || 'seed'; i.mine = f.mine.trim(); });
+}
+function importIdeas(d) {
+  if (!d || d.kind !== 'life-admin-essay-ideas' || !Array.isArray(d.ideas)) throw new Error('bad');
+  let added = 0, updated = 0;
+  for (const n of d.ideas) {
+    const old = S.ideas.find(x => x.key === n.key);
+    if (old) { Object.assign(old, { ...n, status: old.status, mine: old.mine }); updated++; }
+    else { S.ideas.push({ ...n, status: 'seed', mine: '' }); added++; }
+  }
+  S.study.vault = d.vault; S.study.ideasAt = d.generated;
+  return `Imported: ${added} new, ${updated} updated`;
+}
+
+const VIEWS = { today: viewToday, money: viewMoney, food: viewFood, study: viewStudy, life: viewLife };
 
 // ---------- sheet (forms) ----------
 let sheetSubmit = null;
@@ -819,7 +1208,7 @@ function settingsForm() {
 // ---------- actions ----------
 const byId = (arr, id) => arr.find(x => x.id === id);
 const ACTIONS = {
-  goto: el => go(el.dataset.v),
+  goto: el => go(el.dataset.v, el.dataset.s ? (el.dataset.v === 'study' ? 'studySeg' : 'lifeSeg') : null, el.dataset.s),
   seg: el => { ui[el.dataset.k] = el.dataset.v; render(); },
   settings: settingsForm,
   addExpense: () => expenseForm(),
@@ -854,6 +1243,19 @@ const ACTIONS = {
   chore: el => { const c = byId(S.chores, el.dataset.id); c.last = today(); save(); render(); toast(`${c.title} · next ${fmtDate(choreDue(c)).toLowerCase()}`); },
   setdue: el => { $('#sheetForm [name=due]').value = el.dataset.v === '' ? '' : addDays(today(), Number(el.dataset.v)); },
   setevery: el => { $('#sheetForm [name=every]').value = el.dataset.v; },
+  addShift: () => shiftForm(),
+  editShift: el => shiftForm(byId(S.shifts, el.dataset.id)),
+  pasteShifts: pasteShiftsForm,
+  togglePast: () => { ui.showPast = !ui.showPast; render(); },
+  addPiece: () => pieceForm(),
+  editPiece: el => pieceForm(byId(S.pieces, el.dataset.id)),
+  logPractice: el => practiceForm(el.dataset.id),
+  setTarget: el => { const st = $('#sheetForm [name=start]').value || today(); $('#sheetForm [name=target]').value = addDays(st, 7 * Number(el.dataset.v)); },
+  setMins: el => { $('#sheetForm [name=mins]').value = el.dataset.v; },
+  readCh: el => { const d = el.dataset.d; S.study.read[d] = !S.study.read[d]; save(); render(); if (S.study.read[d]) toast('Chapter read ✓'); },
+  chair: el => { const d = el.dataset.d; S.study.chair[d] = !S.study.chair[d]; save(); render(); },
+  bgRead: el => { const i = el.dataset.i; S.study.bg[i] = !S.study.bg[i]; save(); render(); },
+  openIdea: el => ideaForm(S.ideas.find(i => i.key === el.dataset.id)),
   closeSheet: closeSheet,
   sheetDel: () => { if (sheetDel && confirm('Delete this?')) { sheetDel(); save(); closeSheet(); render(); } },
   export: async () => {
@@ -880,6 +1282,15 @@ document.addEventListener('click', e => {
   if (fn) { e.preventDefault(); fn(el); }
 });
 document.addEventListener('change', e => {
+  if (e.target.dataset.a === 'importIdeas' && e.target.files[0]) {
+    const r = new FileReader();
+    r.onload = () => {
+      try { const msg = importIdeas(JSON.parse(r.result)); save(); render(); toast(msg); }
+      catch (err) { toast("That isn't an essay-ideas file from Sync Essay Ideas"); }
+    };
+    r.readAsText(e.target.files[0]);
+    return;
+  }
   if (e.target.dataset.a !== 'import' || !e.target.files[0]) return;
   const r = new FileReader();
   r.onload = () => {
@@ -887,8 +1298,7 @@ document.addEventListener('change', e => {
       const d = JSON.parse(r.result);
       if (!d || !d.settings || !Array.isArray(d.expenses)) throw new Error('bad');
       if (!confirm('Replace everything in the app with this backup?')) return;
-      const base = DEFAULTS();
-      S = { ...base, ...d, settings: { ...base.settings, ...d.settings } };
+      S = merge(d);
       save(); closeSheet(); render(); toast('Backup restored');
     } catch (err) { toast("That file isn't a Life Admin backup"); }
   };
