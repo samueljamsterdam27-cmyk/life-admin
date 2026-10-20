@@ -336,9 +336,14 @@ function addToCalendar(events, label) {
   if (!events.length) { toast('Nothing new to add'); return; }
   const ics = icsText(events);
   const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  let opened = false;
-  if (ios) { try { opened = !!window.open('data:text/calendar;charset=utf-8,' + encodeURIComponent(ics), '_blank'); } catch (e) {} }
-  if (!opened) {
+  if (ios) {
+    // iOS only offers "Add to Calendar" for a real text/calendar response, so the
+    // service worker serves cal.ics from the events packed into the URL.
+    if (!navigator.serviceWorker || !navigator.serviceWorker.controller) { toast('Close and reopen the app once (while online), then try again'); return; }
+    const bytes = new TextEncoder().encode(ics);
+    let bin = ''; bytes.forEach(b => bin += String.fromCharCode(b));
+    location.assign(`cal.ics?d=${btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`);
+  } else {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
     a.download = `${label.replace(/[^A-Za-z0-9 -]/g, '').trim() || 'events'}.ics`;
@@ -355,6 +360,9 @@ const sessionEvent = s => ({ key: `plotinus-${s.date}`, title: `📜 Plotinus: $
 const asgEvent = a => ({ key: `asg-${a.n}-${asgDue(a)}`, title: `✍️ A${a.n} due: ${a.title}`, date: asgDue(a), allDay: true, notes: `${a.length}. ${a.prompt}`, alarms: ['-P2DT15H', '-PT15H'] });
 const BILL_RRULE = { weekly: 'FREQ=WEEKLY', biweekly: 'FREQ=WEEKLY;INTERVAL=2', monthly: 'FREQ=MONTHLY', quarterly: 'FREQ=MONTHLY;INTERVAL=3', yearly: 'FREQ=YEARLY' };
 const billEvent = b => ({ key: `bill-${b.id}-${b.amount}-${b.freq}`, title: `💸 ${b.name} ${money2(b.amount)}${b.autopay ? ' (autopay)' : ''}`, date: b.next, allDay: true, rrule: BILL_RRULE[b.freq] || BILL_RRULE.monthly, alarms: ['-PT15H'] });
+// Only the events not yet sent; once everything has been sent, offer all of them again.
+function newOrAll(evs) { const fresh = evs.filter(e => !S.cal[e.key]); return fresh.length ? { fresh: true, list: fresh } : { fresh: false, list: evs }; }
+const openAsgEvents = () => C().assignments.filter(a => asgStatus(a) !== 'assessed').map(asgEvent);
 const calBtn = (action, label, extra = '') => `<button type="button" class="btn sec block" data-a="${action}" ${extra} style="margin:4px 0 8px">📅 ${label}</button>`;
 
 let toastT;
@@ -574,7 +582,7 @@ function viewBills() {
     ${subs.length ? `<div class="small muted" style="margin-top:8px">Subscriptions cost about ${money(Math.round(monthlySubs * 12))} a year.</div>` : ''}
   </section>
   <button class="btn block" data-a="addBill">+ Add bill or subscription</button>
-  ${S.bills.filter(b => !S.cal[billEvent(b).key]).length ? calBtn('calBills', `Add ${S.bills.filter(b => !S.cal[billEvent(b).key]).length} bill${S.bills.filter(b => !S.cal[billEvent(b).key]).length === 1 ? '' : 's'} to Calendar (repeating)`) : ''}
+  ${S.bills.length ? calBtn('calBills', newOrAll(S.bills.map(billEvent)).fresh ? `Add ${newOrAll(S.bills.map(billEvent)).list.length} bill${newOrAll(S.bills.map(billEvent)).list.length === 1 ? '' : 's'} to Calendar (repeating)` : 'Add bills to Calendar again') : ''}
   <section class="card">
     ${bills.length ? `<ul class="list">${bills.map(b => { const dl = dueLabel(b.next); return `
       <li><div class="grow tap" data-a="editBill" data-id="${b.id}"><div class="t ellipsis">${esc(b.name)} ${b.kind === 'sub' ? '<span class="pill">sub</span>' : ''}</div>
@@ -762,7 +770,7 @@ function viewShifts() {
     <div class="stat"><div class="v">${fmtHours(thisH)}</div><div class="l">this week</div></div>
     <div class="stat"><div class="v">${fmtHours(nextH)}</div><div class="l">next week</div></div></div></section>
   <div class="row"><button class="btn grow" data-a="pasteShifts">Paste boss's text</button><button class="btn sec" data-a="addShift">+ Add</button></div>
-  ${up.filter(s => !S.cal[shiftEvent(s).key]).length ? calBtn('calShifts', `Add ${up.filter(s => !S.cal[shiftEvent(s).key]).length} new shift${up.filter(s => !S.cal[shiftEvent(s).key]).length === 1 ? '' : 's'} to Calendar`) : ''}
+  ${up.length ? calBtn('calShifts', newOrAll(up.map(shiftEvent)).fresh ? `Add ${newOrAll(up.map(shiftEvent)).list.length} new shift${newOrAll(up.map(shiftEvent)).list.length === 1 ? '' : 's'} to Calendar` : 'Add upcoming shifts to Calendar again') : ''}
   <section class="card">
     ${up.length ? grp('This week', up.filter(s => s.date < nws)) + grp('Next week', up.filter(s => s.date >= nws && s.date < addDays(nws, 7))) + grp('Later', up.filter(s => s.date >= addDays(nws, 7)))
       : '<div class="empty">No shifts coming up. When your boss texts the rota, copy the message and tap <b>Paste boss\'s text</b>.</div>'}
@@ -1001,7 +1009,7 @@ function viewPlotinus() {
       <li style="${past && !isNext ? 'opacity:.6' : ''}">${s.label === 'Catch-up' ? '<div style="width:26px"></div>' : `<button class="check ${read ? 'on' : ''}" data-a="readCh" data-d="${s.date}">${read ? ICON_CHECK : ''}</button>`}
       <div class="grow"><div class="t">${s.label}${isNext ? ' <span class="pill warn">next</span>' : ''}</div><div class="s">${parse(s.date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}${s.chair ? ' · chair: ' + s.chair : ''}</div></div>
       ${s.label === 'Catch-up' || past ? (S.study.chair[s.date] ? '<span class="pill good">chaired</span>' : '') : `<button class="pill ${S.study.chair[s.date] ? 'good' : ''}" data-a="chair" data-d="${s.date}">${S.study.chair[s.date] ? 'Chairing ✓' : 'Chair?'}</button>`}</li>`; }).join('')}
-  </ul>${PLOTINUS.sessions.some(s => s.date >= today() && !S.cal[sessionEvent(s).key]) ? calBtn('calPlotinus', 'Add the remaining sessions to Calendar') : '<p class="small muted" style="margin:8px 0 0">📅 Remaining sessions are in your Calendar.</p>'}</section>
+  </ul>${PLOTINUS.sessions.some(s => s.date >= today()) ? calBtn('calPlotinus', newOrAll(PLOTINUS.sessions.filter(s => s.date >= today()).map(sessionEvent)).fresh ? 'Add the remaining sessions to Calendar' : 'Add the remaining sessions to Calendar again') : ''}</section>
   <section class="card"><h2>Background reading <span class="small muted" style="text-transform:none;letter-spacing:0">${nBg}/${PLOTINUS.background.length}</span></h2><ul class="list">
     ${PLOTINUS.background.map(([t, url], i) => `<li><button class="check ${S.study.bg[i] ? 'on' : ''}" data-a="bgRead" data-i="${i}">${S.study.bg[i] ? ICON_CHECK : ''}</button>
       <div class="grow small">${esc(t)}${url ? ` <a href="${url}" target="_blank" rel="noopener" style="color:var(--accent)">open ↗</a>` : ''}</div></li>`).join('')}
@@ -1089,7 +1097,7 @@ function viewCourse() {
   ${soon.length ? `<section class="card"><h2>Books to get soon</h2><ul class="list">${soon.map(b => `<li><div class="grow"><div class="t small" style="font-size:15px">${esc(b.text)}</div><div class="s">Week ${b.weeks.join(', ')} · ${esc(b.edition)}</div></div>
     <button class="pill" data-a="haveBook" data-t="${esc(b.text)}">Got it</button></li>`).join('')}</ul></section>` : ''}
   <section class="card"><h2>Assignments</h2><ul class="list">${c.assignments.map(asgLi).join('')}</ul>
-    ${c.assignments.some(a => asgStatus(a) !== 'assessed' && !S.cal[asgEvent(a).key]) ? calBtn('calAsgs', 'Add due dates to Calendar') : '<p class="small muted" style="margin:8px 0 0">📅 Due dates are in your Calendar.</p>'}
+    ${calBtn('calAsgs', newOrAll(openAsgEvents()).fresh ? 'Add due dates to Calendar' : 'Add due dates to Calendar again')}
     <p class="small muted" style="margin:8px 0 0">Draft in Obsidian under Submissions (e.g. "A1 - …"). Word counts update each time you sync. If you push the plan back, add the due dates again: the moved ones are added as new events.</p></section>
   <section class="card"><h2>All weeks</h2>
     ${c.weeks.map(x => { const core = coreItems(x), dn = core.filter(i => itemDone(x, i)).length; return `<details style="border-top:1px solid var(--line);padding:10px 0">
@@ -1419,12 +1427,12 @@ const ACTIONS = {
   shiftPlan: el => { S.cstate.offset = Math.max(0, (S.cstate.offset || 0) + Number(el.dataset.v)); save(); render(); toast(Number(el.dataset.v) > 0 ? 'Plan pushed back a week' : 'Shift undone'); },
   haveBook: el => { S.cstate.have[el.dataset.t] = 'yes'; save(); render(); },
   openAsg: el => asgForm(C().assignments.find(a => a.n === Number(el.dataset.n))),
-  calShifts: () => addToCalendar(upcomingShifts().filter(s => !S.cal[shiftEvent(s).key]).map(shiftEvent), 'Shifts'),
+  calShifts: () => addToCalendar(newOrAll(upcomingShifts().map(shiftEvent)).list, 'Shifts'),
   calShift: el => { addToCalendar([shiftEvent(byId(S.shifts, el.dataset.id))], 'Shift'); closeSheet(); },
-  calPlotinus: () => addToCalendar(PLOTINUS.sessions.filter(s => s.date >= today() && !S.cal[sessionEvent(s).key]).map(sessionEvent), 'Plotinus reading group'),
-  calAsgs: () => addToCalendar(C().assignments.filter(a => asgStatus(a) !== 'assessed' && !S.cal[asgEvent(a).key]).map(asgEvent), 'Assignment due dates'),
+  calPlotinus: () => addToCalendar(newOrAll(PLOTINUS.sessions.filter(s => s.date >= today()).map(sessionEvent)).list, 'Plotinus reading group'),
+  calAsgs: () => addToCalendar(newOrAll(openAsgEvents()).list, 'Assignment due dates'),
   calAsg: el => { addToCalendar([asgEvent(C().assignments.find(a => a.n === Number(el.dataset.n)))], 'Assignment'); closeSheet(); },
-  calBills: () => addToCalendar(S.bills.filter(b => !S.cal[billEvent(b).key]).map(billEvent), 'Bills'),
+  calBills: () => addToCalendar(newOrAll(S.bills.map(billEvent)).list, 'Bills'),
   calBill: el => { addToCalendar([billEvent(byId(S.bills, el.dataset.id))], 'Bill'); closeSheet(); },
   closeSheet: closeSheet,
   sheetDel: () => { if (sheetDel && confirm('Delete this?')) { sheetDel(); save(); closeSheet(); render(); } },
