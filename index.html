@@ -320,7 +320,8 @@ function icsText(events) {
     if (e.allDay) lines.push(`DTSTART;VALUE=DATE:${d8(e.date)}`, `DTEND;VALUE=DATE:${d8(addDays(e.date, 1))}`);
     else {
       const endDate = toMin(e.end) <= toMin(e.start) ? addDays(e.date, 1) : e.date;
-      lines.push(`DTSTART:${d8(e.date)}T${e.start.replace(':', '')}00`, `DTEND:${d8(endDate)}T${e.end.replace(':', '')}00`);
+      const hm = t => t.slice(0, 5).replace(':', '');
+      lines.push(`DTSTART:${d8(e.date)}T${hm(e.start)}00`, `DTEND:${d8(endDate)}T${hm(e.end)}00`);
     }
     lines.push(`SUMMARY:${escTxt(e.title)}`);
     if (e.location) lines.push(`LOCATION:${escTxt(e.location)}`);
@@ -354,7 +355,7 @@ function addToCalendar(events, label) {
   save(); render();
   toast(`${events.length} event${events.length === 1 ? '' : 's'} sent to Calendar`);
 }
-const shiftEvent = s => ({ key: `shift-${s.id}`, title: '☕ Café shift', date: s.date, start: s.start, end: s.end, notes: s.note, alarms: ['-PT1H'] });
+const shiftEvent = s => ({ key: `shift-${s.id}-${s.date}-${s.start}-${s.end}`, title: '☕ Café shift', date: s.date, start: s.start, end: s.end, notes: s.note, alarms: ['-PT1H'] });
 const sessionEvent = s => ({ key: `plotinus-${s.date}`, title: `📜 Plotinus: ${s.label}${S.study.chair[s.date] ? ' (chairing)' : ''}`, date: s.date, start: '11:00', end: '13:00',
   location: PLOTINUS.where, notes: `${PLOTINUS.text}, ${PLOTINUS.trans}. ${s.label === 'Catch-up' ? 'Catch-up session.' : `Read ${s.label.toLowerCase()} beforehand.`}`, alarms: ['-P1D', '-PT1H'] });
 const asgEvent = a => ({ key: `asg-${a.n}-${asgDue(a)}`, title: `✍️ A${a.n} due: ${a.title}`, date: asgDue(a), allDay: true, notes: `${a.length}. ${a.prompt}`, alarms: ['-P2DT15H', '-PT15H'] });
@@ -836,30 +837,38 @@ function shiftForm(s) {
     <div class="f2"><label class="f"><span>Start</span><input name="start" type="time" value="${s.start}" required></label>
     <label class="f"><span>End</span><input name="end" type="time" value="${s.end}" required></label></div>
     <label class="f"><span>Note</span><input name="note" value="${esc(s.note)}" placeholder="e.g. covering for Jess"></label>
+    <label class="chk"><input type="checkbox" name="toCal" ${S.settings.shiftCal !== false ? 'checked' : ''}> Add to Calendar (reminder 1 hour before)${!isNew && S.cal[shiftEvent(s).key] ? ' (already added)' : ''}</label>
     ${isNew ? '' : calBtn('calShift', S.cal[shiftEvent(s).key] ? 'Add to Calendar again' : 'Add this shift to Calendar', `data-id="${s.id}"`)}`,
     f => {
-      const data = { date: f.date, start: f.start, end: f.end, note: f.note.trim() };
+      const data = { date: f.date, start: f.start.slice(0, 5), end: f.end.slice(0, 5), note: f.note.trim() };
       if (isNew) {
         if (S.shifts.some(x => x.date === data.date && x.start === data.start)) { toast('That shift is already in'); return false; }
         S.shifts.push({ id: uid(), ...data });
       } else Object.assign(s, data);
-      const c = clashText(isNew ? S.shifts.at(-1) : s); toast(c ? `Saved. Heads up: ${c.toLowerCase()}` : 'Shift saved');
+      const sh = isNew ? S.shifts.at(-1) : s;
+      S.settings.shiftCal = !!f.toCal;
+      if (f.toCal && !S.cal[shiftEvent(sh).key]) setTimeout(() => addToCalendar([shiftEvent(sh)], 'Shift'), 60);
+      const c = clashText(sh); toast(c ? `Saved. Heads up: ${c.toLowerCase()}` : 'Shift saved');
     }, { del: isNew ? null : () => { S.shifts = S.shifts.filter(x => x !== s); } });
 }
 function pasteShiftsForm() {
   openSheet('Paste the rota text', `
     <p class="small muted" style="margin-top:-6px">Copy your boss's message and paste it here. For example: <i>"Tue 12-5, Sat 9-3"</i> or <i>"Thursday 23rd 17:00–23:00"</i>.</p>
     <label class="f"><textarea name="txt" rows="4" placeholder="Paste message…" autofocus></textarea></label>
-    <div id="found"></div>`,
+    <div id="found"></div>
+    <label class="chk"><input type="checkbox" name="toCal" ${S.settings.shiftCal !== false ? 'checked' : ''}> Add them to Calendar (reminder 1 hour before)</label>`,
     f => {
       const found = parseShifts(f.txt || '');
       const picks = f._form.querySelectorAll('[name=pick]:checked');
-      let n = 0;
+      const added = [];
       picks.forEach(p => {
         const s = found[Number(p.value)];
-        if (s && !S.shifts.some(x => x.date === s.date && x.start === s.start)) { S.shifts.push({ id: uid(), ...s, note: '' }); n++; }
+        if (s && !S.shifts.some(x => x.date === s.date && x.start === s.start)) { const sh = { id: uid(), ...s, note: '' }; S.shifts.push(sh); added.push(sh); }
       });
+      const n = added.length;
       if (!n) { toast('No new shifts to add'); return false; }
+      S.settings.shiftCal = !!f.toCal;
+      if (f.toCal) setTimeout(() => addToCalendar(added.map(shiftEvent), 'Shifts'), 60);
       toast(`Added ${n} shift${n === 1 ? '' : 's'}`);
       ui.lifeSeg = 'shifts';
     }, { ok: 'Add shifts' });
