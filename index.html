@@ -358,6 +358,9 @@ const shiftEvent = s => ({ key: `shift-${s.id}`, title: '☕ Café shift', date:
 const sessionEvent = s => ({ key: `plotinus-${s.date}`, title: `📜 Plotinus: ${s.label}${S.study.chair[s.date] ? ' (chairing)' : ''}`, date: s.date, start: '11:00', end: '13:00',
   location: PLOTINUS.where, notes: `${PLOTINUS.text}, ${PLOTINUS.trans}. ${s.label === 'Catch-up' ? 'Catch-up session.' : `Read ${s.label.toLowerCase()} beforehand.`}`, alarms: ['-P1D', '-PT1H'] });
 const asgEvent = a => ({ key: `asg-${a.n}-${asgDue(a)}`, title: `✍️ A${a.n} due: ${a.title}`, date: asgDue(a), allDay: true, notes: `${a.length}. ${a.prompt}`, alarms: ['-P2DT15H', '-PT15H'] });
+const taskEvent = x => x.time
+  ? { key: `task-${x.id}-${x.due}-${x.time}`, title: `✅ ${x.title}`, date: x.due, start: x.time, end: `${pad(Math.floor((toMin(x.time) + 30) % 1440 / 60))}:${pad((toMin(x.time) + 30) % 60)}`, notes: x.notes, alarms: ['PT0M'] }
+  : { key: `task-${x.id}-${x.due}`, title: `✅ ${x.title}`, date: x.due, allDay: true, notes: x.notes, alarms: ['PT9H'] };
 const BILL_RRULE = { weekly: 'FREQ=WEEKLY', biweekly: 'FREQ=WEEKLY;INTERVAL=2', monthly: 'FREQ=MONTHLY', quarterly: 'FREQ=MONTHLY;INTERVAL=3', yearly: 'FREQ=YEARLY' };
 const billEvent = b => ({ key: `bill-${b.id}-${b.amount}-${b.freq}`, title: `💸 ${b.name} ${money2(b.amount)}${b.autopay ? ' (autopay)' : ''}`, date: b.next, allDay: true, rrule: BILL_RRULE[b.freq] || BILL_RRULE.monthly, alarms: ['-PT15H'] });
 // Only the events not yet sent; once everything has been sent, offer all of them again.
@@ -709,7 +712,7 @@ function viewTodos() {
   const done = S.tasks.filter(x => x.done).sort((a, b) => (b.doneAt || '').localeCompare(a.doneAt || ''));
   const li = x => `<li class="${x.done ? 'done' : ''}"><button class="check ${x.done ? 'on' : ''}" data-a="task" data-id="${x.id}">${x.done ? ICON_CHECK : ''}</button>
     <div class="grow tap" data-a="editTask" data-id="${x.id}"><div class="t">${esc(x.title)}</div>${x.notes ? `<div class="s ellipsis">${esc(x.notes)}</div>` : ''}</div>
-    ${x.due && !x.done ? `<span class="pill ${dueLabel(x.due).c}">${dueLabel(x.due).t}</span>` : ''}</li>`;
+    ${x.due && !x.done ? `<span class="pill ${dueLabel(x.due).c}">${dueLabel(x.due).t}${x.time ? ' ' + x.time : ''}</span>` : ''}</li>`;
   return `
   <form class="addbar" data-form="task">
     <input name="title" placeholder="Add a to-do…" autocomplete="off" enterkeyhint="done">
@@ -720,7 +723,8 @@ function viewTodos() {
   </section>
   ${done.length ? `<div class="row between"><button class="link" data-a="toggleDone">${ui.showDone ? 'Hide' : 'Show'} completed (${done.length})</button>${ui.showDone ? '<button class="link" data-a="clearDone" style="color:var(--bad)">Clear completed</button>' : ''}</div>
   ${ui.showDone ? `<section class="card"><ul class="list">${done.map(li).join('')}</ul></section>` : ''}` : ''}
-  <p class="small muted">Tap a to-do to add a due date or notes.</p>`;
+  ${open.some(x => x.due && x.due >= today()) ? calBtn('calTasks', newOrAll(open.filter(x => x.due && x.due >= today()).map(taskEvent)).fresh ? `Add ${newOrAll(open.filter(x => x.due && x.due >= today()).map(taskEvent)).list.length} dated to-do${newOrAll(open.filter(x => x.due && x.due >= today()).map(taskEvent)).list.length === 1 ? '' : 's'} to Calendar` : 'Add dated to-dos to Calendar again') : ''}
+  <p class="small muted">Tap a to-do to add a due date, time or notes. Saving one with a date opens "Add to Calendar" with a reminder.</p>`;
 }
 function viewChores() {
   const chores = [...S.chores].sort((a, b) => choreDue(a).localeCompare(choreDue(b)));
@@ -1317,20 +1321,29 @@ function finishTripForm() {
 
 function taskForm(x) {
   const isNew = !x;
-  x = x || { title: '', due: '', notes: '' };
+  x = x || { title: '', due: '', time: '', notes: '' };
+  const calOn = S.settings.taskCal !== false;
   openSheet(isNew ? 'New to-do' : 'Edit to-do', `
     <label class="f"><span>To-do</span><input name="title" value="${esc(x.title)}" required ${isNew ? 'autofocus' : ''}></label>
-    <label class="f"><span>Due date (optional)</span><input name="due" type="date" value="${x.due || ''}"></label>
+    <div class="f2">
+      <label class="f"><span>Due date (optional)</span><input name="due" type="date" value="${x.due || ''}"></label>
+      <label class="f"><span>Time (optional)</span><input name="time" type="time" value="${x.time || ''}"></label>
+    </div>
     <div class="row" style="gap:6px;margin:-6px 0 12px;flex-wrap:wrap">
       <button type="button" class="pill" data-a="setdue" data-v="0">Today</button>
       <button type="button" class="pill" data-a="setdue" data-v="1">Tomorrow</button>
       <button type="button" class="pill" data-a="setdue" data-v="7">Next week</button>
       <button type="button" class="pill" data-a="setdue" data-v="">No date</button>
     </div>
+    <label class="chk"><input type="checkbox" name="toCal" ${calOn ? 'checked' : ''}> Add to Calendar with a reminder${x.due && S.cal[taskEvent(x).key] ? ' (already added)' : ''}</label>
+    <p class="small muted" style="margin:-6px 0 12px">With a time, the reminder goes off at that time; without one, at 9:00 on the day.</p>
     <label class="f"><span>Notes</span><textarea name="notes">${esc(x.notes || '')}</textarea></label>`,
     f => {
-      const data = { title: f.title.trim(), due: f.due, notes: f.notes.trim() };
-      if (isNew) S.tasks.push({ id: uid(), done: false, ...data }); else Object.assign(x, data);
+      const data = { title: f.title.trim(), due: f.due, time: f.due ? f.time : '', notes: f.notes.trim() };
+      if (isNew) { x = { id: uid(), done: false, ...data }; S.tasks.push(x); } else Object.assign(x, data);
+      S.settings.taskCal = !!f.toCal;
+      // Open iOS's "Add to Calendar" sheet once the form has saved and closed, unless this exact event was already sent.
+      if (f.toCal && x.due && !S.cal[taskEvent(x).key]) setTimeout(() => addToCalendar([taskEvent(x)], 'To-do'), 60);
     }, { del: isNew ? null : () => { S.tasks = S.tasks.filter(t => t !== x); } });
 }
 
@@ -1432,6 +1445,7 @@ const ACTIONS = {
   calPlotinus: () => addToCalendar(newOrAll(PLOTINUS.sessions.filter(s => s.date >= today()).map(sessionEvent)).list, 'Plotinus reading group'),
   calAsgs: () => addToCalendar(newOrAll(openAsgEvents()).list, 'Assignment due dates'),
   calAsg: el => { addToCalendar([asgEvent(C().assignments.find(a => a.n === Number(el.dataset.n)))], 'Assignment'); closeSheet(); },
+  calTasks: () => addToCalendar(newOrAll(S.tasks.filter(x => !x.done && x.due && x.due >= today()).map(taskEvent)).list, 'To-dos'),
   calBills: () => addToCalendar(newOrAll(S.bills.map(billEvent)).list, 'Bills'),
   calBill: el => { addToCalendar([billEvent(byId(S.bills, el.dataset.id))], 'Bill'); closeSheet(); },
   closeSheet: closeSheet,
