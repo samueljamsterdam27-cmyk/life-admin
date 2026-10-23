@@ -107,7 +107,7 @@ button.pill { border: 0; min-height: 30px; padding: 4px 12px; }
 .btn.block { width: 100%; }
 .link { background: none; border: 0; color: var(--accent); font-weight: 600; padding: 4px 0; }
 
-.quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 12px; }
+.quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 4px 0 12px; }
 .quick button { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 4px; font-size: 12px; font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 62px; }
 .quick button span.ic { font-size: 20px; line-height: 1; }
 
@@ -214,6 +214,7 @@ const DEFAULTS = () => ({
     unit: 'mi',
     currency: '$',
     categories: ['Groceries', 'Dining out', 'Transport', 'Shopping', 'Bills', 'Subscriptions', 'Fun', 'Health', 'Other'],
+    body: { height: 183, age: 27, sex: 'male', activity: 1.5, surplus: 250, protein: 1.8 },
   },
   expenses: [],
   bills: [],
@@ -229,6 +230,9 @@ const DEFAULTS = () => ({
   course: null,
   cstate: { done: {}, offset: 0, asg: {}, have: {} },
   cal: {},
+  gym: { templates: null, sessions: [], active: null },
+  food: { log: [], saved: [], kcal: 0, p: 0 },
+  body: { weights: null },
 });
 
 function merge(d) {
@@ -408,6 +412,7 @@ function go(tab, segKey, segVal) {
   ui.tab = tab; render(); window.scrollTo(0, 0);
 }
 function render() {
+  ensureFit();
   if (!VIEWS[ui.tab]) ui.tab = 'today';
   try { sessionStorage.setItem('la.ui', JSON.stringify({ tab: ui.tab, moneySeg: ui.moneySeg, foodSeg: ui.foodSeg, taskSeg: ui.taskSeg, studySeg: ui.studySeg, lifeSeg: ui.lifeSeg })); } catch (e) {}
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === ui.tab));
@@ -423,7 +428,7 @@ const seg = (key, opts, cls = '') => `<div class="seg ${cls}">${opts.map(([v, l]
 function choreDue(c) { return c.last ? addDays(c.last, c.every) : today(); }
 
 function weekCard() {
-  const rows = [];
+  const rows = [fitnessTodayRows()];
   const sh = upcomingShifts()[0];
   if (sh) {
     const wkHours = shiftsInWeek(weekStart(today())).reduce((a, s) => a + shiftHours(s), 0);
@@ -500,6 +505,8 @@ function viewToday() {
     <button data-a="addTask"><span class="ic">✅</span>To-do</button>
     <button data-a="addShift"><span class="ic">☕</span>Shift</button>
     <button data-a="logPractice"><span class="ic">🎹</span>Practice</button>
+    <button data-a="quickFood"><span class="ic">🍽️</span>Food</button>
+    <button data-a="quickGym"><span class="ic">🏋️</span>Gym</button>
   </div>
 
   ${weekCard()}
@@ -600,8 +607,8 @@ function viewBills() {
 
 // ---------- FOOD ----------
 function viewFood() {
-  return header('Food', '') + seg('foodSeg', [['list', `Grocery list${S.grocery.length ? ` (${S.grocery.filter(g => !g.done).length})` : ''}`], ['pantry', 'Pantry']]) +
-    (ui.foodSeg === 'list' ? viewList() : viewPantry());
+  return header('Food', '') + seg('foodSeg', [['eat', 'Nutrition'], ['list', `Grocery list${S.grocery.length ? ` (${S.grocery.filter(g => !g.done).length})` : ''}`], ['pantry', 'Pantry']]) +
+    (ui.foodSeg === 'eat' ? viewEat() : ui.foodSeg === 'list' ? viewList() : viewPantry());
 }
 function aisleSelect(name, val) {
   return `<select name="${name}" ${name === 'aisle' ? 'style="max-width:42%"' : ''}>${AISLES.map(a => `<option ${a === val ? 'selected' : ''}>${a}</option>`).join('')}</select>`;
@@ -742,8 +749,8 @@ function viewChores() {
 
 // ---------- LIFE (runs, piano, shifts, tasks) ----------
 function viewLife() {
-  const sub = { runs: viewRuns, piano: viewPiano, shifts: viewShifts, tasks: viewTasks }[ui.lifeSeg] || viewRuns;
-  return header('Life', '') + seg('lifeSeg', [['runs', 'Runs'], ['piano', 'Piano'], ['shifts', 'Shifts'], ['tasks', 'Tasks']]) + sub();
+  const sub = { runs: viewRuns, gym: viewGym, piano: viewPiano, shifts: viewShifts, tasks: viewTasks }[ui.lifeSeg] || viewRuns;
+  return header('Life', '') + seg('lifeSeg', [['gym', 'Gym'], ['runs', 'Runs'], ['piano', 'Piano'], ['shifts', 'Shifts'], ['tasks', 'Tasks']], 'sm') + sub();
 }
 
 // shifts
@@ -1185,6 +1192,342 @@ function importIdeas(d) {
   return `Imported ${added + updated} essay ideas${courseMsg}`;
 }
 
+// ---------- GYM ----------
+const EXERCISES = ['Back squat', 'Bench press', 'Seated cable row', 'Lateral raise', 'Hanging knee raise', 'Romanian deadlift', 'Overhead press', 'Lat pulldown', 'Leg press',
+  'Dumbbell curl', 'Triceps pushdown', 'Deadlift', 'Incline dumbbell press', 'Dumbbell bench press', 'Dumbbell row', 'Pull-up', 'Chin-up', 'Push-up', 'Dips', 'Leg curl',
+  'Leg extension', 'Calf raise', 'Hip thrust', 'Bulgarian split squat', 'Goblet squat', 'Face pull', 'Cable fly', 'Hammer curl', 'Barbell row', 'Shoulder press machine', 'Chest press machine'];
+const exT = (name, sets, lo, hi, inc) => ({ name, sets, lo, hi, inc });
+const BEGINNER = () => [
+  { id: 'A', name: 'Workout A', exercises: [exT('Back squat', 3, 6, 8, 5), exT('Bench press', 3, 6, 8, 2.5), exT('Seated cable row', 3, 8, 10, 2.5), exT('Lateral raise', 2, 12, 15, 1), exT('Hanging knee raise', 2, 10, 15, 0)] },
+  { id: 'B', name: 'Workout B', exercises: [exT('Romanian deadlift', 3, 8, 10, 5), exT('Overhead press', 3, 6, 8, 2.5), exT('Lat pulldown', 3, 8, 10, 2.5), exT('Leg press', 2, 10, 12, 5), exT('Dumbbell curl', 2, 10, 12, 1), exT('Triceps pushdown', 2, 10, 12, 2.5)] },
+];
+const G = () => S.gym;
+const e1rm = (w, r) => w * (1 + r / 30);
+const fmtKg = w => `${Math.round(w * 100) / 100} kg`;
+function lastPerf(name, beforeId) {
+  const ss = [...G().sessions].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  for (const s of ss) { if (s.id === beforeId) continue; const e = s.exercises.find(x => x.name.toLowerCase() === name.toLowerCase()); if (e && e.sets.length) return { date: s.date, sets: e.sets }; }
+  return null;
+}
+function suggest(t) {
+  const last = lastPerf(t.name);
+  if (!last) return { w: '', note: 'First time: pick a weight you could lift for 2–3 more reps than the target' };
+  const top = Math.max(...last.sets.map(s => s.w || 0));
+  const topSets = last.sets.filter(s => (s.w || 0) === top);
+  const hit = t.hi && topSets.length >= t.sets && topSets.every(s => s.r >= t.hi);
+  if (hit && t.inc) return { w: top + t.inc, note: `+${t.inc} kg: you hit ${t.hi} reps on every set last time` };
+  return { w: top || '', note: top ? `Same weight as ${fmtDate(last.date).toLowerCase()}: aim for ${t.hi || 'more'} reps` : `Last time: ${last.sets.map(s => s.r).join(', ')} reps` };
+}
+function nextTemplate() {
+  const ts = G().templates; if (!ts.length) return null;
+  const last = [...G().sessions].filter(s => s.tid).sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))[0];
+  const i = last ? ts.findIndex(t => t.id === last.tid) : -1;
+  return ts[(i + 1) % ts.length];
+}
+function startWorkout(tid) {
+  const t = G().templates.find(x => x.id === tid);
+  G().active = {
+    id: uid(), date: today(), started: new Date().toISOString(), tid: t ? t.id : null, name: t ? t.name : 'Workout',
+    exercises: t ? t.exercises.map(e => { const sg = suggest(e); return { ...e, note: sg.note, sets: Array.from({ length: e.sets }, () => ({ w: sg.w, r: '', done: false })) }; }) : [],
+  };
+  save(); ui.lifeSeg = 'gym'; go('life');
+}
+function finishWorkout() {
+  const a = G().active;
+  const exs = a.exercises.map(e => ({ name: e.name, sets: e.sets.filter(s => Number(s.r) > 0).map(s => ({ w: Number(s.w) || 0, r: Number(s.r) })) })).filter(e => e.sets.length);
+  if (!exs.length) { if (confirm('No sets logged. Discard this workout?')) { G().active = null; save(); render(); } return; }
+  let prs = 0;
+  for (const e of exs) {
+    const best = Math.max(...e.sets.map(s => e1rm(s.w, s.r)));
+    const prev = G().sessions.flatMap(s => s.exercises.filter(x => x.name.toLowerCase() === e.name.toLowerCase()).flatMap(x => x.sets)).reduce((m, s) => Math.max(m, e1rm(s.w, s.r)), 0);
+    if (prev && best > prev && best > 0) prs++;
+  }
+  G().sessions.push({ id: a.id, date: a.date, tid: a.tid, name: a.name, mins: Math.round((Date.now() - new Date(a.started)) / 60000), exercises: exs });
+  G().active = null; save(); render();
+  toast(prs ? `Workout saved · ${prs} new best${prs > 1 ? 's' : ''} 💪` : 'Workout saved 💪');
+}
+function viewGym() {
+  const a = G().active;
+  const dl = `<datalist id="exlist">${[...new Set([...EXERCISES, ...G().sessions.flatMap(s => s.exercises.map(e => e.name))])].map(n => `<option value="${esc(n)}">`).join('')}</datalist>`;
+  if (a) return dl + `
+  <section class="card"><div class="row between"><div><div class="t" style="font-size:18px;font-weight:700">${esc(a.name)}</div><div class="small muted">Started ${new Date(a.started).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</div></div>
+    <button class="btn" data-a="finishWorkout">Finish</button></div></section>
+  ${a.exercises.map((e, i) => `<section class="card">
+    <div class="row between"><button class="link" data-a="exHistory" data-n="${esc(e.name)}" style="font-size:17px;color:var(--ink);text-align:left">${esc(e.name)} ›</button>
+      ${e.hi ? `<span class="pill">${e.sets.length} × ${e.lo}–${e.hi}</span>` : ''}</div>
+    ${e.note ? `<div class="small muted" style="margin:2px 0 6px">${esc(e.note)}</div>` : ''}
+    <div class="row small muted" style="gap:8px;margin:6px 0 2px"><span style="width:22px">Set</span><span class="grow">kg</span><span class="grow">reps</span><span style="width:26px"></span></div>
+    ${e.sets.map((s, j) => `<div class="row" style="gap:8px;margin:6px 0">
+      <span style="width:22px;text-align:center;font-weight:600">${j + 1}</span>
+      <input class="grow" type="number" inputmode="decimal" step="0.5" value="${s.w}" data-g="w" data-e="${i}" data-s="${j}" placeholder="kg" style="min-height:40px;padding:6px 10px">
+      <input class="grow" type="number" inputmode="numeric" value="${s.r}" data-g="r" data-e="${i}" data-s="${j}" placeholder="${e.hi ? e.lo + '–' + e.hi : 'reps'}" style="min-height:40px;padding:6px 10px">
+      <button class="check ${s.done ? 'on' : ''}" data-a="setDone" data-e="${i}" data-s="${j}">${s.done ? ICON_CHECK : ''}</button></div>`).join('')}
+    <div class="row between" style="margin-top:4px"><button class="link small" data-a="addSet" data-e="${i}">+ Add set</button><button class="link small" data-a="rmExercise" data-e="${i}" style="color:var(--muted)">Remove exercise</button></div>
+  </section>`).join('')}
+  <form class="addbar" data-form="addex"><input name="name" list="exlist" placeholder="Add an exercise…" autocomplete="off"><button class="btn" style="min-width:56px">Add</button></form>
+  <button class="link" data-a="discardWorkout" style="color:var(--bad)">Discard workout</button>`;
+
+  const nx = nextTemplate();
+  const ss = [...G().sessions].sort((x, y) => y.date.localeCompare(x.date) || y.id.localeCompare(x.id));
+  const wk = ss.filter(s => s.date >= weekStart(today())).length;
+  const names = [...new Set(ss.flatMap(s => s.exercises.map(e => e.name)))];
+  const bests = names.map(n => { let b = null; ss.forEach(s => s.exercises.filter(e => e.name === n).forEach(e => e.sets.forEach(st => { if (!b || e1rm(st.w, st.r) > e1rm(b.w, b.r)) b = st; }))); return [n, b]; }).filter(x => x[1] && x[1].w);
+  return dl + `
+  <section class="card"><div class="stats" style="grid-template-columns:1fr 1fr">
+    <div class="stat"><div class="v">${wk}</div><div class="l">workouts this week</div></div>
+    <div class="stat"><div class="v">${ss[0] ? fmtDate(ss[0].date) : '—'}</div><div class="l">last workout</div></div></div></section>
+  ${nx ? `<section class="card"><h2>Next up <button class="link small" data-a="editTemplates">Edit plan</button></h2>
+    <div class="t" style="font-size:18px;font-weight:700;margin-bottom:6px">${esc(nx.name)}</div>
+    <ul class="list">${nx.exercises.map(e => { const sg = suggest(e); return `<li style="min-height:40px;padding:8px 0"><div class="grow"><div class="t">${esc(e.name)}</div><div class="s">${e.sets} × ${e.lo}–${e.hi}${sg.w ? ` · ${fmtKg(sg.w)}` : ''}</div></div>${sg.note.startsWith('+') ? '<span class="pill good">add weight</span>' : ''}</li>`; }).join('')}</ul>
+    <button class="btn block" data-a="startWorkout" data-t="${esc(nx.id)}" style="margin-top:8px">Start ${esc(nx.name)}</button>
+    <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${G().templates.filter(t => t.id !== nx.id).map(t => `<button class="pill" data-a="startWorkout" data-t="${esc(t.id)}">Start ${esc(t.name)}</button>`).join('')}<button class="pill" data-a="startWorkout" data-t="">Empty workout</button></div>
+  </section>` : `<button class="btn block" data-a="startWorkout" data-t="">Start an empty workout</button><button class="link" data-a="editTemplates">Set up a plan</button>`}
+  ${G().templates.some(t => t.id === 'A') && G().sessions.length < 3 ? `<p class="small muted">The beginner plan: alternate A and B, 3 days a week with a rest day in between (e.g. Mon/Wed/Fri). When you hit the top of the rep range on every set, the app tells you to add weight next time. Use "Edit plan" to change exercises or add your own workouts.</p>` : ''}
+  ${ss.length ? `<section class="card"><h2>History</h2><ul class="list">${ss.slice(0, 15).map(s => `<li class="tap" data-a="openSession" data-id="${s.id}"><div class="grow"><div class="t">${esc(s.name)}</div>
+    <div class="s ellipsis">${fmtDate(s.date)} · ${s.exercises.length} exercises · ${s.exercises.reduce((n, e) => n + e.sets.length, 0)} sets${s.mins ? ` · ${s.mins} min` : ''}</div></div></li>`).join('')}</ul></section>` : ''}
+  ${bests.length ? `<section class="card"><h2>Best sets</h2><ul class="list">${bests.map(([n, b]) => `<li class="tap" data-a="exHistory" data-n="${esc(n)}" style="min-height:40px;padding:8px 0"><span class="grow">${esc(n)}</span><span class="amt">${fmtKg(b.w)} × ${b.r}</span></li>`).join('')}</ul></section>` : ''}`;
+}
+function exHistoryForm(name) {
+  const rows = G().sessions.filter(s => s.exercises.some(e => e.name.toLowerCase() === name.toLowerCase())).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 12);
+  openSheet(esc(name), rows.length ? `<ul class="list">${rows.map(s => { const e = s.exercises.find(x => x.name.toLowerCase() === name.toLowerCase()); const best = Math.max(...e.sets.map(st => e1rm(st.w, st.r)));
+    return `<li style="min-height:40px;padding:8px 0"><div class="grow"><div class="t small" style="font-size:15px">${fmtDate(s.date)}</div><div class="s">${e.sets.map(st => `${st.w}×${st.r}`).join(', ')}</div></div><span class="small muted">~${Math.round(best)} kg 1RM</span></li>`; }).join('')}</ul>
+    <p class="small muted">"1RM" is an estimate of the most you could lift once, from your best set. It's a handy way to compare sessions done at different reps.</p>` : '<p class="muted">No history yet for this exercise.</p>', () => {}, { ok: 'Close' });
+}
+function sessionForm(s) {
+  openSheet(`${esc(s.name)} · ${fmtDate(s.date)}`, `<ul class="list">${s.exercises.map(e => `<li style="min-height:40px;padding:8px 0"><div class="grow"><div class="t">${esc(e.name)}</div><div class="s">${e.sets.map(st => `${st.w} kg × ${st.r}`).join(' · ')}</div></div></li>`).join('')}</ul>`,
+    () => {}, { ok: 'Close', del: () => { G().sessions = G().sessions.filter(x => x !== s); } });
+}
+function templatesForm() {
+  const txt = t => t.exercises.map(e => `${e.name}, ${e.sets} x ${e.lo}-${e.hi}${e.inc ? `, +${e.inc}` : ''}`).join('\n');
+  const ts = G().templates;
+  openSheet('Your workouts', `
+    <p class="small muted" style="margin-top:-6px">One exercise per line: <b>name, sets x reps, +kg</b>. For example <i>Bench press, 3 x 6-8, +2.5</i> means 3 sets of 6–8 reps; add 2.5 kg once you hit 8 on every set.</p>
+    ${ts.map((t, i) => `<label class="f"><span>Name</span><input name="n${i}" value="${esc(t.name)}"></label><label class="f"><textarea name="x${i}" rows="6">${esc(txt(t))}</textarea></label>`).join('')}
+    <div class="group-h">Add your own workout</div>
+    <label class="f"><span>Name</span><input name="nnew" placeholder="e.g. Upper body"></label>
+    <label class="f"><textarea name="xnew" rows="4" placeholder="Incline dumbbell press, 3 x 8-12, +2&#10;Pull-up, 3 x 5-8"></textarea></label>
+    <p class="small muted">Empty a workout's exercise list to delete it. Workouts rotate in order (A, B, then your own), and "Next up" picks the one after your last.</p>
+    <button type="button" class="link small" data-a="resetPlan">Reset to the beginner plan</button>`,
+    f => {
+      const parseLines = s => s.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+        const [name, scheme = '', inc = ''] = l.split(',').map(x => x.trim());
+        const m = scheme.match(/(\d+)\s*x\s*(\d+)(?:\s*-\s*(\d+))?/i);
+        return exT(name, m ? Number(m[1]) : 3, m ? Number(m[2]) : 8, m ? Number(m[3] || m[2]) : 12, parseFloat(inc.replace('+', '')) || 0);
+      });
+      const out = [];
+      ts.forEach((t, i) => { const ex = parseLines(f['x' + i] || ''); if (ex.length) out.push({ id: t.id, name: (f['n' + i] || t.name).trim(), exercises: ex }); });
+      const nx = parseLines(f.xnew || '');
+      if (nx.length) out.push({ id: uid(), name: (f.nnew || 'My workout').trim(), exercises: nx });
+      G().templates = out;
+      toast('Workouts saved');
+    });
+}
+
+// ---------- NUTRITION ----------
+const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
+const F = () => S.food;
+const latestWeight = () => { const w = [...S.body.weights].sort((a, b) => b.date.localeCompare(a.date))[0]; return w ? w.kg : 75; };
+function calcTargets() {
+  const b = S.settings.body, kg = latestWeight();
+  const bmr = 10 * kg + 6.25 * b.height - 5 * b.age + (b.sex === 'male' ? 5 : b.sex === 'female' ? -161 : -78);
+  const tdee = bmr * b.activity;
+  return { tdee: Math.round(tdee / 50) * 50, kcal: Math.round((tdee + b.surplus) / 50) * 50, p: Math.round(kg * b.protein / 5) * 5 };
+}
+const targets = () => { const c = calcTargets(); return { kcal: F().kcal || c.kcal, p: F().p || c.p, auto: !F().kcal && !F().p, tdee: c.tdee }; };
+const dayLog = d => F().log.filter(x => x.date === d);
+const sumDay = d => dayLog(d).reduce((a, x) => ({ kcal: a.kcal + x.kcal, p: a.p + x.p }), { kcal: 0, p: 0 });
+const r0 = n => Math.round(n);
+const defaultMeal = () => { const h = new Date().getHours(); return h < 11 ? 'Breakfast' : h < 15 ? 'Lunch' : h < 17 ? 'Snacks' : h < 21 ? 'Dinner' : 'Snacks'; };
+function avgWeight(endDate, days = 7) {
+  const ws = S.body.weights.filter(w => w.date <= endDate && w.date > addDays(endDate, -days));
+  return ws.length ? ws.reduce((a, w) => a + w.kg, 0) / ws.length : null;
+}
+function weightAdvice() {
+  const ws = [...S.body.weights].sort((a, b) => a.date.localeCompare(b.date));
+  if (ws.length < 4 || diffDays(today(), ws[0].date) < 21) return 'Weigh in a few mornings a week (after the loo, before eating). After about 3 weeks the app compares your averages and suggests whether to eat more or less.';
+  const now = avgWeight(today()), then = avgWeight(addDays(today(), -28));
+  if (now == null || then == null) return 'Log a few more weigh-ins to see your trend.';
+  const perMonth = (now - then) * 28 / Math.min(28, diffDays(today(), ws[0].date));
+  if (perMonth < 0.3) return `You're gaining about ${perMonth.toFixed(1)} kg a month, slower than the ~1 kg aim. Try adding about 150 kcal a day.`;
+  if (perMonth > 1.6) return `You're gaining about ${perMonth.toFixed(1)} kg a month, a bit fast for lean gains. Try about 150 kcal a day less.`;
+  return `You're gaining about ${perMonth.toFixed(1)} kg a month. Right on track for a lean bulk.`;
+}
+function viewEat() {
+  const d = ui.foodDay || today();
+  const t = targets(), s = sumDay(d);
+  const bar = (v, max, c) => `<div class="bar" style="height:10px"><i style="width:${Math.min(100, v / max * 100)}%;${c ? `background:${c}` : ''}"></i></div>`;
+  const items = dayLog(d);
+  const lw = [...S.body.weights].sort((a, b) => b.date.localeCompare(a.date))[0];
+  const av = avgWeight(today());
+  return `
+  <div class="row between" style="margin:4px 0"><button class="link" data-a="foodDay" data-v="-1">‹</button><strong>${fmtDate(d)}</strong><button class="link" data-a="foodDay" data-v="1" ${d >= today() ? 'style="visibility:hidden"' : ''}>›</button></div>
+  <section class="card">
+    <div class="row between"><span><b class="big" style="font-size:24px">${r0(s.kcal).toLocaleString()}</b> <span class="muted">/ ${t.kcal.toLocaleString()} kcal</span></span><span class="small muted">${s.kcal < t.kcal ? `${r0(t.kcal - s.kcal).toLocaleString()} to go` : 'target hit ✓'}</span></div>
+    ${bar(s.kcal, t.kcal)}
+    <div class="row between" style="margin-top:12px"><span><b class="big" style="font-size:24px">${r0(s.p)}</b> <span class="muted">/ ${t.p} g protein</span></span><span class="small muted">${s.p < t.p ? `${r0(t.p - s.p)} g to go` : 'target hit ✓'}</span></div>
+    ${bar(s.p, t.p, 'var(--warn)')}
+  </section>
+  <div class="row"><button class="btn grow" data-a="foodAdd" data-v="saved">+ Add food</button>${dayLog(addDays(d, -1)).length && !items.length ? '<button class="btn sec" data-a="copyDay">Copy yesterday</button>' : ''}</div>
+  <section class="card">
+    ${items.length ? MEALS.filter(m => items.some(x => x.meal === m)).map(m => { const xs = items.filter(x => x.meal === m); const ms = xs.reduce((a, x) => ({ kcal: a.kcal + x.kcal, p: a.p + x.p }), { kcal: 0, p: 0 });
+      return `<div class="group-h row between"><span>${m} · ${r0(ms.kcal)} kcal · ${r0(ms.p)} g</span>${xs.length > 1 ? `<button class="link small" data-a="saveMeal" data-m="${m}" style="text-transform:none;letter-spacing:0">Save as meal</button>` : ''}</div>
+      <ul class="list">${xs.map(x => `<li class="tap" data-a="editEntry" data-id="${x.id}" style="min-height:44px;padding:8px 0"><div class="grow"><div class="t ellipsis">${esc(x.name)}</div><div class="s">${x.qty ? esc(x.qty) : ''}</div></div><span class="small muted" style="text-align:right">${r0(x.kcal)} kcal<br>${r0(x.p)} g</span></li>`).join('')}</ul>`; }).join('')
+      : '<div class="empty">Nothing logged yet. Tap <b>+ Add food</b>. Save foods and meals you eat often so they\'re one tap next time.</div>'}
+  </section>
+  <section class="card"><h2>Body weight <button class="link small" data-a="logWeight">+ Log</button></h2>
+    <div class="stats" style="grid-template-columns:1fr 1fr">
+      <div class="stat"><div class="v">${lw ? fmtKg(lw.kg) : '—'}</div><div class="l">${lw ? fmtDate(lw.date).toLowerCase() : 'latest'}</div></div>
+      <div class="stat"><div class="v">${av ? fmtKg(Math.round(av * 10) / 10) : '—'}</div><div class="l">7-day average</div></div></div>
+    <p class="small muted" style="margin:10px 0 0">${weightAdvice()}</p></section>
+  <section class="card tap" data-a="editTargets"><h2>Targets <span class="link">Edit</span></h2>
+    <div class="small">${t.kcal.toLocaleString()} kcal · ${t.p} g protein a day${t.auto ? ` <span class="muted">(maintenance ≈ ${t.tdee.toLocaleString()} + ${S.settings.body.surplus} for a lean bulk; protein ${S.settings.body.protein} g per kg)</span>` : ' <span class="muted">(set by you)</span>'}</div></section>`;
+}
+let foodHits = [];
+function foodAddSheet(mode, q = '') {
+  const meal = ui.meal || defaultMeal();
+  const tabs = `<div class="seg" style="margin-top:-4px">${[['saved', 'Saved'], ['quick', 'Quick'], ['search', 'Search']].map(([v, l]) => `<button type="button" class="${mode === v ? 'on' : ''}" data-a="foodAdd" data-v="${v}">${l}</button>`).join('')}</div>
+    <label class="f"><span>Meal</span><select name="meal" data-a2="meal">${MEALS.map(m => `<option ${m === meal ? 'selected' : ''}>${m}</option>`).join('')}</select></label>`;
+  if (mode === 'saved') {
+    const sv = [...F().saved].sort((a, b) => (b.used || 0) - (a.used || 0) || a.name.localeCompare(b.name));
+    openSheet('Add food', tabs + `
+      <input name="filter" placeholder="Filter saved foods…" data-a2="filter" autocomplete="off" style="margin-bottom:8px">
+      ${sv.length ? `<ul class="list" id="savedList">${sv.map(x => `<li class="tap" data-a="pickSaved" data-id="${x.id}" data-name="${esc(x.name.toLowerCase())}" style="min-height:44px;padding:8px 0"><div class="grow"><div class="t ellipsis">${x.kind === 'meal' ? '🍱 ' : ''}${esc(x.name)}</div><div class="s">${esc(x.serving || '1 serving')} · ${r0(x.kcal)} kcal · ${r0(x.p)} g</div></div><button type="button" class="link small" data-a="editSaved" data-id="${x.id}">Edit</button></li>`).join('')}</ul>`
+        : '<p class="small muted">No saved foods yet. Add one below, use <b>Quick</b> or <b>Search</b> and tick "save", or log a meal and tap "Save as meal".</p>'}
+      <button type="button" class="btn sec block" data-a="editSaved" style="margin-top:8px">+ New saved food</button>`, () => false, { ok: 'Done' });
+    $('#sheetForm .actions .btn:not(.sec)').style.display = 'none';
+  } else if (mode === 'quick') {
+    openSheet('Add food', tabs + `
+      <label class="f"><span>What (optional)</span><input name="name" placeholder="e.g. Chicken wrap"></label>
+      <div class="f2"><label class="f"><span>Calories</span><input name="kcal" type="number" inputmode="numeric" min="0" required autofocus></label>
+      <label class="f"><span>Protein (g)</span><input name="p" type="number" inputmode="decimal" min="0" step="0.1" value="0"></label></div>
+      <label class="chk"><input type="checkbox" name="keep"> Save it for next time</label>`,
+      f => {
+        const kcal = Number(f.kcal) || 0, p = Number(f.p) || 0, name = f.name.trim() || 'Quick add';
+        logFood({ name, kcal, p, meal: f.meal });
+        if (f.keep) F().saved.push({ id: uid(), name, kcal, p, kind: 'food', serving: '1 serving', used: 1 });
+      }, { ok: 'Add' });
+  } else {
+    openSheet('Add food', tabs + `
+      <div class="addbar"><input name="q" value="${esc(q)}" placeholder="e.g. Greek yoghurt, Heinz beans" autocomplete="off" enterkeyhint="search" data-a2="search"><button type="button" class="btn" data-a="foodSearch">Search</button></div>
+      <div id="hits">${foodHits.length ? hitsHtml() : '<p class="small muted">Searches Open Food Facts (needs internet). Values are per 100 g; you set the amount.</p>'}</div>`, () => { runFoodSearch(); return false; }, { ok: 'Done' });
+    $('#sheetForm .actions .btn:not(.sec)').style.display = 'none';
+  }
+}
+function hitsHtml() {
+  return `<ul class="list">${foodHits.map((h, i) => `<li class="tap" data-a="pickHit" data-i="${i}" style="min-height:44px;padding:8px 0"><div class="grow"><div class="t clamp2">${esc(h.name)}</div><div class="s ellipsis">${esc(h.brand)}${h.brand ? ' · ' : ''}per 100 g: ${r0(h.kcal)} kcal · ${Math.round(h.p * 10) / 10} g</div></div></li>`).join('')}</ul>`;
+}
+async function runFoodSearch() {
+  const q = $('#sheetForm [name=q]').value.trim();
+  if (!q) return;
+  $('#hits').innerHTML = '<p class="small muted">Searching…</p>';
+  const fields = 'product_name,brands,nutriments,serving_quantity,serving_size';
+  const urls = [`https://uk.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=25&fields=${fields}`,
+    `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=25&fields=${fields}`];
+  foodHits = [];
+  let failed = 0;
+  // The database is often briefly busy (it rate-limits searches), so retry once after a pause.
+  for (const u of [...urls, urls[0]]) {
+    if (failed === 2) await new Promise(r => setTimeout(r, 2500));
+    try {
+      const d = await (await fetch(u)).json();
+      foodHits = (d.products || []).map(p => ({ name: p.product_name || '', brand: p.brands || '', kcal: Number(p.nutriments && p.nutriments['energy-kcal_100g']), p: Number(p.nutriments && p.nutriments.proteins_100g) || 0, serving: Number(p.serving_quantity) || 0, servingLabel: p.serving_size || '' }))
+        .filter(h => h.name && h.kcal >= 0 && !isNaN(h.kcal));
+      if (foodHits.length || d.products) break;
+    } catch (e) { failed++; }
+  }
+  if ($('#hits')) $('#hits').innerHTML = foodHits.length ? hitsHtml()
+    : failed >= 3 ? '<p class="small muted">The food database (Open Food Facts) is busy right now. Try again in a minute, or use <b>Quick</b>.</p>'
+    : '<p class="small muted">Nothing found. Try a simpler word (e.g. "yoghurt" instead of a full product name), or use <b>Quick</b>.</p>';
+}
+function amountSheet(item) {
+  // item: { name, kcal, p, per100?: bool, grams?, serving? }
+  const meal = ui.meal || defaultMeal();
+  const per100 = !!item.per100;
+  openSheet(esc(item.name), `
+    <label class="f"><span>Meal</span><select name="meal">${MEALS.map(m => `<option ${m === meal ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
+    <label class="f"><span>${per100 ? 'Amount (g)' : `Servings (${esc(item.serving || '1 serving')})`}</span><input name="amt" type="number" inputmode="decimal" step="any" min="0" value="${per100 ? (item.grams || 100) : 1}" autofocus></label>
+    <div class="thesis" id="amtOut"></div>
+    ${item.fromSearch ? `<label class="chk"><input type="checkbox" name="keep" checked> Save to my foods</label>` : ''}`,
+    f => {
+      const n = Number(f.amt) || 0; if (!n) return false;
+      const k = per100 ? n / 100 : n;
+      logFood({ name: item.name, kcal: item.kcal * k, p: item.p * k, meal: f.meal, qty: per100 ? `${n} g` : (n === 1 ? (item.serving || '') : `${n} × ${item.serving || 'serving'}`) });
+      if (item.savedId) { const sv = F().saved.find(x => x.id === item.savedId); if (sv) sv.used = (sv.used || 0) + 1; }
+      if (f.keep) F().saved.push({ id: uid(), name: item.name, kcal: item.kcal, p: item.p, per100: true, grams: n, serving: '100 g', kind: 'food', used: 1 });
+    }, { ok: 'Add' });
+  const upd = () => { const n = Number($('#sheetForm [name=amt]').value) || 0; const k = per100 ? n / 100 : n; $('#amtOut').textContent = `${r0(item.kcal * k)} kcal · ${Math.round(item.p * k * 10) / 10} g protein`; };
+  $('#sheetForm').addEventListener('input', upd); upd();
+}
+function logFood({ name, kcal, p, meal, qty = '' }) {
+  ui.meal = meal;
+  F().log.push({ id: uid(), date: ui.foodDay || today(), meal, name, kcal: Math.round(kcal * 10) / 10, p: Math.round(p * 10) / 10, qty });
+  toast(`Added ${name}`);
+}
+function savedForm(x) {
+  const isNew = !x;
+  x = x || { name: '', kcal: '', p: '', serving: '1 serving', per100: false };
+  openSheet(isNew ? 'New saved food' : 'Edit ' + esc(x.name), `
+    <label class="f"><span>Name</span><input name="name" value="${esc(x.name)}" required placeholder="e.g. Porridge with whey" ${isNew ? 'autofocus' : ''}></label>
+    <label class="chk"><input type="checkbox" name="per100" ${x.per100 ? 'checked' : ''}> Values are per 100 g (you'll enter grams each time)</label>
+    <div class="f2"><label class="f"><span>Calories</span><input name="kcal" type="number" inputmode="decimal" step="any" min="0" required value="${x.kcal}"></label>
+    <label class="f"><span>Protein (g)</span><input name="p" type="number" inputmode="decimal" step="any" min="0" value="${x.p}"></label></div>
+    <label class="f"><span>Serving description</span><input name="serving" value="${esc(x.serving || '')}" placeholder="e.g. 1 bowl, 2 slices"></label>`,
+    f => {
+      const data = { name: f.name.trim(), kcal: Number(f.kcal) || 0, p: Number(f.p) || 0, per100: !!f.per100, serving: f.per100 ? '100 g' : (f.serving.trim() || '1 serving') };
+      if (isNew) F().saved.push({ id: uid(), kind: 'food', used: 0, ...data }); else Object.assign(x, data);
+      setTimeout(() => foodAddSheet('saved'), 300);
+    }, { del: isNew ? null : () => { F().saved = F().saved.filter(s => s !== x); } });
+}
+function entryForm(x) {
+  openSheet('Edit ' + esc(x.name), `
+    <label class="f"><span>Name</span><input name="name" value="${esc(x.name)}"></label>
+    <div class="f2"><label class="f"><span>Calories</span><input name="kcal" type="number" inputmode="decimal" step="any" value="${x.kcal}"></label>
+    <label class="f"><span>Protein (g)</span><input name="p" type="number" inputmode="decimal" step="any" value="${x.p}"></label></div>
+    <label class="f"><span>Meal</span><select name="meal">${MEALS.map(m => `<option ${m === x.meal ? 'selected' : ''}>${m}</option>`).join('')}</select></label>`,
+    f => { Object.assign(x, { name: f.name.trim() || x.name, kcal: Number(f.kcal) || 0, p: Number(f.p) || 0, meal: f.meal }); },
+    { del: () => { F().log = F().log.filter(e => e !== x); } });
+}
+function weightForm() {
+  openSheet('Log body weight', `
+    <div class="f2"><label class="f"><span>Weight (kg)</span><input name="kg" type="number" inputmode="decimal" step="0.1" min="20" required value="${latestWeight()}" autofocus></label>
+    <label class="f"><span>Date</span><input name="date" type="date" value="${today()}" required></label></div>
+    <p class="small muted">Best first thing in the morning. Day-to-day swings of 1 kg are normal (water, food), so the app goes by your weekly average.</p>`,
+    f => { S.body.weights = S.body.weights.filter(w => w.date !== f.date); S.body.weights.push({ date: f.date, kg: Number(f.kg) }); toast('Weight logged'); });
+}
+function targetsForm() {
+  const b = S.settings.body, c = calcTargets();
+  openSheet('Calorie & protein targets', `
+    <div class="f2"><label class="f"><span>Height (cm)</span><input name="height" type="number" inputmode="numeric" value="${b.height}"></label>
+    <label class="f"><span>Age</span><input name="age" type="number" inputmode="numeric" value="${b.age}"></label></div>
+    <label class="f"><span>Activity</span><select name="activity">${[[1.375, 'Light: desk job, gym 1–3×/week'], [1.5, 'Moderate: on your feet at work, gym 3×/week plus some running'], [1.65, 'High: active job and training 4–5×/week'], [1.8, 'Very high: hard training most days']].map(([v, l]) => `<option value="${v}" ${Number(b.activity) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    <div class="f2"><label class="f"><span>Surplus (kcal/day)</span><input name="surplus" type="number" inputmode="numeric" step="50" value="${b.surplus}"></label>
+    <label class="f"><span>Protein (g per kg)</span><input name="protein" type="number" inputmode="decimal" step="0.1" value="${b.protein}"></label></div>
+    <p class="small muted">Calculated from your latest weight (${fmtKg(latestWeight())}): maintenance ≈ ${c.tdee.toLocaleString()} kcal, so about <b>${c.kcal.toLocaleString()} kcal</b> and <b>${c.p} g protein</b>. These update as your weight changes.</p>
+    <div class="group-h">Or set your own (leave blank to use the calculation)</div>
+    <div class="f2"><label class="f"><span>Calories</span><input name="kcal" type="number" inputmode="numeric" value="${F().kcal || ''}"></label>
+    <label class="f"><span>Protein (g)</span><input name="p" type="number" inputmode="numeric" value="${F().p || ''}"></label></div>`,
+    f => {
+      Object.assign(b, { height: Number(f.height) || b.height, age: Number(f.age) || b.age, activity: Number(f.activity), surplus: Number(f.surplus) || 0, protein: Number(f.protein) || 1.8 });
+      F().kcal = Number(f.kcal) || 0; F().p = Number(f.p) || 0;
+    });
+}
+function fitnessTodayRows() {
+  const rows = [];
+  const t = targets(), s = sumDay(today());
+  rows.push(`<div class="wk tap" data-a="goto" data-v="food" data-s="eat"><div class="ic">🍽️</div><div class="grow"><div class="t">${r0(s.kcal).toLocaleString()} / ${t.kcal.toLocaleString()} kcal · ${r0(s.p)} / ${t.p} g protein</div>
+    <div class="bar" style="margin-top:6px"><i style="width:${Math.min(100, s.p / t.p * 100)}%;background:var(--warn)"></i></div></div></div>`);
+  const a = G().active, nx = nextTemplate(), last = [...G().sessions].sort((x, y) => y.date.localeCompare(x.date))[0];
+  rows.push(`<div class="wk tap" data-a="goto" data-v="life" data-s="gym"><div class="ic">🏋️</div><div class="grow"><div class="t">${a ? `${esc(a.name)} in progress` : nx ? `Next workout: ${esc(nx.name)}` : 'Gym'}</div>
+    <div class="s muted">${last ? `Last workout ${fmtDate(last.date).toLowerCase()}` : 'No workouts logged yet'}</div></div></div>`);
+  return rows.join('');
+}
+
+// Fill in defaults that need helpers defined above (DEFAULTS runs before them).
+function ensureFit() {
+  if (!S.gym.templates) S.gym.templates = BEGINNER();
+  if (!S.body.weights) S.body.weights = [{ date: today(), kg: 79.8 }];
+}
+
 const VIEWS = { today: viewToday, money: viewMoney, food: viewFood, study: viewStudy, life: viewLife };
 
 // ---------- sheet (forms) ----------
@@ -1397,7 +1740,7 @@ function settingsForm() {
 // ---------- actions ----------
 const byId = (arr, id) => arr.find(x => x.id === id);
 const ACTIONS = {
-  goto: el => go(el.dataset.v, el.dataset.s ? (el.dataset.v === 'study' ? 'studySeg' : 'lifeSeg') : null, el.dataset.s),
+  goto: el => go(el.dataset.v, el.dataset.s ? { study: 'studySeg', life: 'lifeSeg', food: 'foodSeg', money: 'moneySeg' }[el.dataset.v] : null, el.dataset.s),
   seg: el => { ui[el.dataset.k] = el.dataset.v; render(); },
   settings: settingsForm,
   addExpense: () => expenseForm(),
@@ -1457,6 +1800,33 @@ const ACTIONS = {
   calTasks: () => addToCalendar(newOrAll(S.tasks.filter(x => !x.done && x.due && x.due >= today()).map(taskEvent)).list, 'To-dos'),
   calBills: () => addToCalendar(newOrAll(S.bills.map(billEvent)).list, 'Bills'),
   calBill: el => { addToCalendar([billEvent(byId(S.bills, el.dataset.id))], 'Bill'); closeSheet(); },
+  quickFood: () => { ui.foodSeg = 'eat'; ui.foodDay = today(); go('food'); foodAddSheet('saved'); },
+  quickGym: () => { ui.lifeSeg = 'gym'; go('life'); },
+  startWorkout: el => { if (G().active && !confirm('A workout is already in progress. Replace it?')) return; startWorkout(el.dataset.t); },
+  finishWorkout: finishWorkout,
+  discardWorkout: () => { if (confirm('Discard this workout?')) { G().active = null; save(); render(); } },
+  setDone: el => { const e = G().active.exercises[el.dataset.e], st = e.sets[el.dataset.s]; st.done = !st.done; if (st.done && st.r === '') st.r = e.hi || ''; save(); render(); },
+  addSet: el => { const e = G().active.exercises[el.dataset.e]; const last = e.sets[e.sets.length - 1]; e.sets.push({ w: last ? last.w : '', r: '', done: false }); save(); render(); },
+  rmExercise: el => { G().active.exercises.splice(Number(el.dataset.e), 1); save(); render(); },
+  exHistory: el => exHistoryForm(el.dataset.n),
+  openSession: el => sessionForm(G().sessions.find(s => s.id === el.dataset.id)),
+  editTemplates: templatesForm,
+  resetPlan: () => { if (confirm('Replace your workouts with the beginner plan (A and B)?')) { G().templates = BEGINNER(); save(); closeSheet(); render(); toast('Beginner plan restored'); } },
+  foodAdd: el => foodAddSheet(el.dataset.v, ($('#sheetForm [name=q]') || {}).value || ''),
+  foodSearch: () => runFoodSearch(),
+  pickSaved: el => { const x = F().saved.find(s => s.id === el.dataset.id); amountSheet({ name: x.name, kcal: x.kcal, p: x.p, per100: x.per100, grams: x.grams, serving: x.serving, savedId: x.id }); },
+  pickHit: el => { const h = foodHits[Number(el.dataset.i)]; amountSheet({ name: h.brand ? `${h.name} (${h.brand.split(',')[0]})` : h.name, kcal: h.kcal, p: h.p, per100: true, grams: h.serving || 100, fromSearch: true }); },
+  editSaved: el => savedForm(el.dataset.id ? F().saved.find(s => s.id === el.dataset.id) : null),
+  editEntry: el => entryForm(F().log.find(x => x.id === el.dataset.id)),
+  foodDay: el => { ui.foodDay = addDays(ui.foodDay || today(), Number(el.dataset.v)); if (ui.foodDay > today()) ui.foodDay = today(); render(); },
+  copyDay: () => { const d = ui.foodDay || today(); dayLog(addDays(d, -1)).forEach(x => F().log.push({ ...x, id: uid(), date: d })); save(); render(); toast("Copied yesterday's food"); },
+  saveMeal: el => {
+    const d = ui.foodDay || today(), m = el.dataset.m, xs = dayLog(d).filter(x => x.meal === m);
+    openSheet('Save as a meal', `<label class="f"><span>Name</span><input name="name" value="${esc(m)}" required autofocus></label><p class="small muted">${xs.map(x => esc(x.name)).join(', ')}: ${r0(xs.reduce((a, x) => a + x.kcal, 0))} kcal, ${r0(xs.reduce((a, x) => a + x.p, 0))} g protein. Next time it's one tap under Saved.</p>`,
+      f => { F().saved.push({ id: uid(), kind: 'meal', name: f.name.trim(), kcal: xs.reduce((a, x) => a + x.kcal, 0), p: xs.reduce((a, x) => a + x.p, 0), serving: xs.map(x => x.name).join(' + '), used: 1 }); toast('Meal saved'); });
+  },
+  logWeight: weightForm,
+  editTargets: targetsForm,
   closeSheet: closeSheet,
   sheetDel: () => { if (sheetDel && confirm('Delete this?')) { sheetDel(); save(); closeSheet(); render(); } },
   export: async () => {
@@ -1505,6 +1875,12 @@ document.addEventListener('change', e => {
   };
   r.readAsText(e.target.files[0]);
 });
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.g && G().active) { const st = G().active.exercises[t.dataset.e].sets[t.dataset.s]; st[t.dataset.g] = t.value; save(); }
+  if (t.dataset.a2 === 'filter') { const q = t.value.toLowerCase(); document.querySelectorAll('#savedList li').forEach(li => li.style.display = li.dataset.name.includes(q) ? '' : 'none'); }
+});
+document.addEventListener('change', e => { if (e.target.dataset.a2 === 'meal') ui.meal = e.target.value; });
 $('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) go(b.dataset.tab); });
 
 // inline add forms
@@ -1515,6 +1891,11 @@ document.addEventListener('submit', e => {
   const input = e.target.querySelector('input');
   const val = input.value.trim();
   if (!val) return;
+  if (kind === 'addex') {
+    const sg = suggest({ name: val, sets: 3, hi: 0, inc: 0 });
+    G().active.exercises.push({ name: val, sets: [0, 1, 2].map(() => ({ w: sg.w, r: '', done: false })), lo: '', hi: '', inc: 0, note: lastPerf(val) ? sg.note : '' });
+    save(); render(); return;
+  }
   if (kind === 'grocery') {
     if (S.grocery.some(g => g.name.toLowerCase() === val.toLowerCase() && !g.done)) { toast('Already on the list'); input.value = ''; return; }
     S.grocery.push({ id: uid(), name: val, aisle: guessAisle(val), qty: '', done: false });
