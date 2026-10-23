@@ -230,7 +230,7 @@ const DEFAULTS = () => ({
   course: null,
   cstate: { done: {}, offset: 0, asg: {}, have: {} },
   cal: {},
-  gym: { templates: null, sessions: [], active: null },
+  gym: { templates: null, sessions: [], active: null, other: [] },
   food: { log: [], saved: [], kcal: 0, p: 0 },
   body: { weights: null },
 });
@@ -1224,10 +1224,10 @@ function nextTemplate() {
   const i = last ? ts.findIndex(t => t.id === last.tid) : -1;
   return ts[(i + 1) % ts.length];
 }
-function startWorkout(tid) {
+function startWorkout(tid, date) {
   const t = G().templates.find(x => x.id === tid);
   G().active = {
-    id: uid(), date: today(), started: new Date().toISOString(), tid: t ? t.id : null, name: t ? t.name : 'Workout',
+    id: uid(), date: date || today(), past: !!(date && date !== today()), started: new Date().toISOString(), tid: t ? t.id : null, name: t ? t.name : 'Workout',
     exercises: t ? t.exercises.map(e => { const sg = suggest(e); return { ...e, note: sg.note, sets: Array.from({ length: e.sets }, () => ({ w: sg.w, r: '', done: false })) }; }) : [],
   };
   save(); ui.lifeSeg = 'gym'; go('life');
@@ -1242,7 +1242,7 @@ function finishWorkout() {
     const prev = G().sessions.flatMap(s => s.exercises.filter(x => x.name.toLowerCase() === e.name.toLowerCase()).flatMap(x => x.sets)).reduce((m, s) => Math.max(m, e1rm(s.w, s.r)), 0);
     if (prev && best > prev && best > 0) prs++;
   }
-  G().sessions.push({ id: a.id, date: a.date, tid: a.tid, name: a.name, mins: Math.round((Date.now() - new Date(a.started)) / 60000), exercises: exs });
+  G().sessions.push({ id: a.id, date: a.date, tid: a.tid, name: a.name, mins: a.past ? 0 : Math.round((Date.now() - new Date(a.started)) / 60000), exercises: exs });
   G().active = null; save(); render();
   toast(prs ? `Workout saved · ${prs} new best${prs > 1 ? 's' : ''} 💪` : 'Workout saved 💪');
 }
@@ -1250,8 +1250,9 @@ function viewGym() {
   const a = G().active;
   const dl = `<datalist id="exlist">${[...new Set([...EXERCISES, ...G().sessions.flatMap(s => s.exercises.map(e => e.name))])].map(n => `<option value="${esc(n)}">`).join('')}</datalist>`;
   if (a) return dl + `
-  <section class="card"><div class="row between"><div><div class="t" style="font-size:18px;font-weight:700">${esc(a.name)}</div><div class="small muted">Started ${new Date(a.started).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</div></div>
-    <button class="btn" data-a="finishWorkout">Finish</button></div></section>
+  <section class="card"><div class="row between"><div><div class="t" style="font-size:18px;font-weight:700">${esc(a.name)}</div><div class="small muted">${a.past ? 'Logging a past workout' : `Started ${new Date(a.started).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`}</div></div>
+    <button class="btn" data-a="finishWorkout">${a.past ? 'Save' : 'Finish'}</button></div>
+    <label class="f" style="margin:10px 0 0"><span>Date</span><input type="date" value="${a.date}" max="${today()}" data-g2="date"></label></section>
   ${a.exercises.map((e, i) => `<section class="card">
     <div class="row between"><button class="link" data-a="exHistory" data-n="${esc(e.name)}" style="font-size:17px;color:var(--ink);text-align:left">${esc(e.name)} ›</button>
       ${e.hi ? `<span class="pill">${e.sets.length} × ${e.lo}–${e.hi}</span>` : ''}</div>
@@ -1269,23 +1270,59 @@ function viewGym() {
 
   const nx = nextTemplate();
   const ss = [...G().sessions].sort((x, y) => y.date.localeCompare(x.date) || y.id.localeCompare(x.id));
-  const wk = ss.filter(s => s.date >= weekStart(today())).length;
+  const other = [...(G().other || [])].sort((x, y) => y.date.localeCompare(x.date) || y.id.localeCompare(x.id));
+  const wk = ss.filter(s => s.date >= weekStart(today())).length + other.filter(o => o.date >= weekStart(today())).length;
+  const lastAny = [ss[0] && ss[0].date, other[0] && other[0].date].filter(Boolean).sort().pop();
   const names = [...new Set(ss.flatMap(s => s.exercises.map(e => e.name)))];
   const bests = names.map(n => { let b = null; ss.forEach(s => s.exercises.filter(e => e.name === n).forEach(e => e.sets.forEach(st => { if (!b || e1rm(st.w, st.r) > e1rm(b.w, b.r)) b = st; }))); return [n, b]; }).filter(x => x[1] && x[1].w);
   return dl + `
   <section class="card"><div class="stats" style="grid-template-columns:1fr 1fr">
     <div class="stat"><div class="v">${wk}</div><div class="l">workouts this week</div></div>
-    <div class="stat"><div class="v">${ss[0] ? fmtDate(ss[0].date) : '—'}</div><div class="l">last workout</div></div></div></section>
+    <div class="stat"><div class="v">${lastAny ? fmtDate(lastAny) : '—'}</div><div class="l">last workout</div></div></div></section>
   ${nx ? `<section class="card"><h2>Next up <button class="link small" data-a="editTemplates">Edit plan</button></h2>
     <div class="t" style="font-size:18px;font-weight:700;margin-bottom:6px">${esc(nx.name)}</div>
     <ul class="list">${nx.exercises.map(e => { const sg = suggest(e); return `<li style="min-height:40px;padding:8px 0"><div class="grow"><div class="t">${esc(e.name)}</div><div class="s">${e.sets} × ${e.lo}–${e.hi}${sg.w ? ` · ${fmtKg(sg.w)}` : ''}</div></div>${sg.note.startsWith('+') ? '<span class="pill good">add weight</span>' : ''}</li>`; }).join('')}</ul>
     <button class="btn block" data-a="startWorkout" data-t="${esc(nx.id)}" style="margin-top:8px">Start ${esc(nx.name)}</button>
     <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${G().templates.filter(t => t.id !== nx.id).map(t => `<button class="pill" data-a="startWorkout" data-t="${esc(t.id)}">Start ${esc(t.name)}</button>`).join('')}<button class="pill" data-a="startWorkout" data-t="">Empty workout</button></div>
   </section>` : `<button class="btn block" data-a="startWorkout" data-t="">Start an empty workout</button><button class="link" data-a="editTemplates">Set up a plan</button>`}
+  <div class="row" style="gap:8px"><button class="btn sec grow" data-a="pastWorkout">Log a past gym session</button><button class="btn sec grow" data-a="addOther">+ Other workout</button></div>
+  ${other.length ? `<section class="card"><h2>Other workouts</h2><ul class="list">${other.slice(0, 12).map(o => `<li class="tap" data-a="editOther" data-id="${o.id}"><div style="font-size:22px">${OTHER_ICON[o.type] || '🏅'}</div>
+    <div class="grow"><div class="t">${esc(o.type)}${o.mins ? ` <span class="muted">· ${o.mins} min</span>` : ''}${o.dist ? ` <span class="muted">· ${esc(String(o.dist))} km</span>` : ''}</div><div class="s ellipsis">${fmtDate(o.date)}${o.feel ? ' · ' + FEELS[o.feel - 1] : ''}${o.notes ? ' · ' + esc(o.notes) : ''}</div></div></li>`).join('')}</ul></section>` : ''}
   ${G().templates.some(t => t.id === 'A') && G().sessions.length < 3 ? `<p class="small muted">The beginner plan: alternate A and B, 3 days a week with a rest day in between (e.g. Mon/Wed/Fri). When you hit the top of the rep range on every set, the app tells you to add weight next time. Use "Edit plan" to change exercises or add your own workouts.</p>` : ''}
   ${ss.length ? `<section class="card"><h2>History</h2><ul class="list">${ss.slice(0, 15).map(s => `<li class="tap" data-a="openSession" data-id="${s.id}"><div class="grow"><div class="t">${esc(s.name)}</div>
     <div class="s ellipsis">${fmtDate(s.date)} · ${s.exercises.length} exercises · ${s.exercises.reduce((n, e) => n + e.sets.length, 0)} sets${s.mins ? ` · ${s.mins} min` : ''}</div></div></li>`).join('')}</ul></section>` : ''}
   ${bests.length ? `<section class="card"><h2>Best sets</h2><ul class="list">${bests.map(([n, b]) => `<li class="tap" data-a="exHistory" data-n="${esc(n)}" style="min-height:40px;padding:8px 0"><span class="grow">${esc(n)}</span><span class="amt">${fmtKg(b.w)} × ${b.r}</span></li>`).join('')}</ul></section>` : ''}`;
+}
+const OTHER_TYPES = ['Class', 'Swim', 'Cycle', 'Football', 'Yoga', 'Walk / hike', 'Climbing', 'HIIT', 'Rowing', 'Sport'];
+const OTHER_ICON = { Class: '🤸', Swim: '🏊', Cycle: '🚴', Football: '⚽', Yoga: '🧘', 'Walk / hike': '🥾', Climbing: '🧗', HIIT: '🔥', Rowing: '🚣', Sport: '🏸' };
+function pastWorkoutForm() {
+  if (G().active && !confirm('A workout is already in progress. Replace it?')) return;
+  openSheet('Log a past gym session', `
+    <label class="f"><span>Date</span><input name="date" type="date" value="${addDays(today(), -1)}" max="${today()}" required></label>
+    <label class="f"><span>Workout</span><select name="tid">${G().templates.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}<option value="">Empty (add exercises yourself)</option></select></label>
+    <p class="small muted">You'll get the usual set-by-set screen. Fill in what you did, delete anything you skipped, then tap Save.</p>`,
+    f => { setTimeout(() => startWorkout(f.tid, f.date), 0); }, { ok: 'Continue' });
+}
+function otherForm(o) {
+  const isNew = !o;
+  o = o || { date: today(), type: '', mins: '', dist: '', feel: 0, notes: '' };
+  openSheet(isNew ? 'Log a workout' : 'Edit workout', `
+    <label class="f"><span>What did you do?</span><input name="type" value="${esc(o.type)}" list="otherTypes" required placeholder="e.g. Swim, spin class, 5-a-side" ${isNew ? 'autofocus' : ''}></label>
+    <datalist id="otherTypes">${OTHER_TYPES.map(t => `<option value="${t}">`).join('')}</datalist>
+    <div class="row" style="gap:6px;margin:-6px 0 12px;flex-wrap:wrap">${OTHER_TYPES.map(t => `<button type="button" class="pill" data-a="setOtherType" data-v="${t}">${OTHER_ICON[t]} ${t}</button>`).join('')}</div>
+    <div class="f3">
+      <label class="f"><span>Date</span><input name="date" type="date" value="${o.date}" max="${today()}" required></label>
+      <label class="f"><span>Minutes</span><input name="mins" type="number" inputmode="numeric" min="0" value="${o.mins}"></label>
+      <label class="f"><span>Km (optional)</span><input name="dist" type="number" inputmode="decimal" step="0.1" min="0" value="${o.dist}"></label>
+    </div>
+    <label class="f"><span>How did it feel?</span></label>
+    <div class="feel" style="margin:-8px 0 12px">${FEELS.map((e, i) => `<label><input type="radio" name="feel" value="${i + 1}" ${o.feel === i + 1 ? 'checked' : ''}><span>${e}</span></label>`).join('')}</div>
+    <label class="f"><span>Notes</span><input name="notes" value="${esc(o.notes)}" placeholder="e.g. 40 lengths, legs tired"></label>`,
+    f => {
+      const data = { date: f.date, type: f.type.trim(), mins: parseInt(f.mins) || 0, dist: parseFloat(f.dist) || 0, feel: parseInt(f.feel) || 0, notes: f.notes.trim() };
+      if (!G().other) G().other = [];
+      if (isNew) { G().other.push({ id: uid(), ...data }); toast(`${data.type} logged 💪`); } else Object.assign(o, data);
+    }, { del: isNew ? null : () => { G().other = G().other.filter(x => x !== o); } });
 }
 function exHistoryForm(name) {
   const rows = G().sessions.filter(s => s.exercises.some(e => e.name.toLowerCase() === name.toLowerCase())).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 12);
@@ -1516,7 +1553,7 @@ function fitnessTodayRows() {
   const t = targets(), s = sumDay(today());
   rows.push(`<div class="wk tap" data-a="goto" data-v="food" data-s="eat"><div class="ic">🍽️</div><div class="grow"><div class="t">${r0(s.kcal).toLocaleString()} / ${t.kcal.toLocaleString()} kcal · ${r0(s.p)} / ${t.p} g protein</div>
     <div class="bar" style="margin-top:6px"><i style="width:${Math.min(100, s.p / t.p * 100)}%;background:var(--warn)"></i></div></div></div>`);
-  const a = G().active, nx = nextTemplate(), last = [...G().sessions].sort((x, y) => y.date.localeCompare(x.date))[0];
+  const a = G().active, nx = nextTemplate(), last = [...G().sessions, ...(G().other || [])].sort((x, y) => y.date.localeCompare(x.date))[0];
   rows.push(`<div class="wk tap" data-a="goto" data-v="life" data-s="gym"><div class="ic">🏋️</div><div class="grow"><div class="t">${a ? `${esc(a.name)} in progress` : nx ? `Next workout: ${esc(nx.name)}` : 'Gym'}</div>
     <div class="s muted">${last ? `Last workout ${fmtDate(last.date).toLowerCase()}` : 'No workouts logged yet'}</div></div></div>`);
   return rows.join('');
@@ -1525,6 +1562,7 @@ function fitnessTodayRows() {
 // Fill in defaults that need helpers defined above (DEFAULTS runs before them).
 function ensureFit() {
   if (!S.gym.templates) S.gym.templates = BEGINNER();
+  if (!S.gym.other) S.gym.other = [];
   if (!S.body.weights) S.body.weights = [{ date: today(), kg: 79.8 }];
 }
 
@@ -1811,6 +1849,10 @@ const ACTIONS = {
   exHistory: el => exHistoryForm(el.dataset.n),
   openSession: el => sessionForm(G().sessions.find(s => s.id === el.dataset.id)),
   editTemplates: templatesForm,
+  pastWorkout: pastWorkoutForm,
+  addOther: () => otherForm(),
+  editOther: el => otherForm(G().other.find(o => o.id === el.dataset.id)),
+  setOtherType: el => { $('#sheetForm [name=type]').value = el.dataset.v; },
   resetPlan: () => { if (confirm('Replace your workouts with the beginner plan (A and B)?')) { G().templates = BEGINNER(); save(); closeSheet(); render(); toast('Beginner plan restored'); } },
   foodAdd: el => foodAddSheet(el.dataset.v, ($('#sheetForm [name=q]') || {}).value || ''),
   foodSearch: () => runFoodSearch(),
@@ -1877,10 +1919,14 @@ document.addEventListener('change', e => {
 });
 document.addEventListener('input', e => {
   const t = e.target;
+  if (t.dataset.g2 === 'date' && G().active && t.value) { G().active.date = t.value; G().active.past = t.value !== today(); save(); }
   if (t.dataset.g && G().active) { const st = G().active.exercises[t.dataset.e].sets[t.dataset.s]; st[t.dataset.g] = t.value; save(); }
   if (t.dataset.a2 === 'filter') { const q = t.value.toLowerCase(); document.querySelectorAll('#savedList li').forEach(li => li.style.display = li.dataset.name.includes(q) ? '' : 'none'); }
 });
-document.addEventListener('change', e => { if (e.target.dataset.a2 === 'meal') ui.meal = e.target.value; });
+document.addEventListener('change', e => {
+  if (e.target.dataset.a2 === 'meal') ui.meal = e.target.value;
+  if (e.target.dataset.g2 === 'date' && G().active && e.target.value) { G().active.date = e.target.value; G().active.past = e.target.value !== today(); save(); render(); }
+});
 $('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) go(b.dataset.tab); });
 
 // inline add forms
