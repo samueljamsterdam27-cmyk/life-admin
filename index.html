@@ -404,11 +404,11 @@ function runAutopay() {
 }
 
 // ---------- state / routing ----------
-const ui = { tab: 'today', moneySeg: 'spend', foodSeg: 'list', taskSeg: 'todo', studySeg: 'plotinus', lifeSeg: 'runs', month: monthKey(today()), showDone: false, showPast: false };
+const ui = { tab: 'today', moneySeg: 'spend', foodSeg: 'list', taskSeg: 'todo', studySeg: 'plotinus', lifeSeg: 'gym', month: monthKey(today()), showDone: false, showPast: false };
 try { Object.assign(ui, JSON.parse(sessionStorage.getItem('la.ui') || '{}'), { month: monthKey(today()) }); } catch (e) {}
 
 function go(tab, segKey, segVal) {
-  if (tab === 'runs' || tab === 'tasks') { segKey = 'lifeSeg'; segVal = tab; tab = 'life'; }
+  if (tab === 'runs' || tab === 'tasks') { segKey = 'lifeSeg'; segVal = tab === 'runs' ? 'gym' : tab; tab = 'life'; }
   if (segKey) ui[segKey] = segVal;
   ui.tab = tab; render(); window.scrollTo(0, 0);
 }
@@ -673,16 +673,14 @@ function viewPantry() {
 }
 
 // ---------- RUNS ----------
-function viewRuns() {
+// Running lives inside the Gym section as one card.
+function runsCard() {
   const t = today();
   const runs = [...S.runs].sort((a, b) => b.date.localeCompare(a.date));
   const ws = weekStart(t);
   const sum = arr => arr.reduce((a, r) => a + r.dist, 0);
   const wk = runs.filter(r => r.date >= ws);
   const mo = runs.filter(r => monthKey(r.date) === monthKey(t));
-  const yr = runs.filter(r => r.date.slice(0, 4) === t.slice(0, 4));
-
-  // 8 week chart
   const weeks = [];
   for (let i = 7; i >= 0; i--) {
     const s = addDays(ws, -7 * i), e = addDays(s, 6);
@@ -691,25 +689,20 @@ function viewRuns() {
   const max = Math.max(...weeks.map(w => w.d), 1);
   const longest = runs.reduce((a, r) => !a || r.dist > a.dist ? r : a, null);
   const fastest = runs.filter(r => r.dist >= 1).reduce((a, r) => !a || r.secs / r.dist < a.secs / a.dist ? r : a, null);
-
-  return `
-  <section class="card">
-    <div class="stats">
+  const li = r => `<li class="tap" data-a="editRun" data-id="${r.id}"><div style="font-size:22px">${r.feel ? FEELS[r.feel - 1] : '🏃'}</div>
+    <div class="grow"><div class="t">${fmtDist(r.dist)} <span class="muted">· ${fmtDur(r.secs)}</span></div><div class="s ellipsis">${fmtDate(r.date)} · ${fmtPace(r.secs, r.dist)}${r.notes ? ' · ' + esc(r.notes) : ''}</div></div></li>`;
+  if (!runs.length) return '';
+  return `<section class="card"><h2>Running <button class="link small" data-a="addRun">+ Run</button></h2>
+    <div class="stats" style="grid-template-columns:1fr 1fr">
       <div class="stat"><div class="v">${fmtDist(sum(wk))}</div><div class="l">this week · ${wk.length} run${wk.length === 1 ? '' : 's'}</div></div>
       <div class="stat"><div class="v">${fmtDist(sum(mo))}</div><div class="l">this month</div></div>
-      <div class="stat"><div class="v">${fmtDist(sum(yr))}</div><div class="l">${t.slice(0, 4)}</div></div>
     </div>
     <div class="chart" aria-label="Weekly distance, last 8 weeks">${weeks.map(w => `
       <div class="col ${w.cur ? 'cur' : ''}"><b>${w.d ? Math.round(w.d * 10) / 10 : ''}</b><i style="height:${w.d / max * 75}%"></i><span>${parse(w.s).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}</span></div>`).join('')}
     </div>
-    ${runs.length ? `<div class="small muted" style="margin-top:10px">Longest: ${fmtDist(longest.dist)} (${fmtDate(longest.date)})${fastest ? ` · Fastest pace: ${fmtPace(fastest.secs, fastest.dist)}` : ''}</div>` : ''}
-  </section>
-  <button class="btn block" data-a="addRun">+ Log a run</button>
-  <section class="card">
-    ${runs.length ? `<ul class="list">${runs.map(r => `
-      <li class="tap" data-a="editRun" data-id="${r.id}"><div style="font-size:24px">${r.feel ? FEELS[r.feel - 1] : '🏃'}</div>
-      <div class="grow"><div class="t">${fmtDist(r.dist)} <span class="muted">· ${fmtDur(r.secs)}</span></div><div class="s ellipsis">${fmtDate(r.date)} · ${fmtPace(r.secs, r.dist)}${r.notes ? ' · ' + esc(r.notes) : ''}</div></div></li>`).join('')}</ul>`
-      : '<div class="empty">No runs yet. Log one and your pace is worked out for you.</div>'}
+    <div class="small muted" style="margin:10px 0 4px">Longest: ${fmtDist(longest.dist)} (${fmtDate(longest.date)})${fastest ? ` · Fastest pace: ${fmtPace(fastest.secs, fastest.dist)}` : ''}</div>
+    <ul class="list">${runs.slice(0, 4).map(li).join('')}</ul>
+    ${runs.length > 4 ? `<details><summary class="link small" style="cursor:pointer;padding:6px 0">${runs.length - 4} more run${runs.length - 4 === 1 ? '' : 's'}</summary><ul class="list">${runs.slice(4).map(li).join('')}</ul></details>` : ''}
   </section>`;
 }
 
@@ -751,8 +744,9 @@ function viewChores() {
 
 // ---------- LIFE (runs, piano, shifts, tasks) ----------
 function viewLife() {
-  const sub = { runs: viewRuns, gym: viewGym, piano: viewPiano, shifts: viewShifts, tasks: viewTasks }[ui.lifeSeg] || viewRuns;
-  return header('Life', '') + seg('lifeSeg', [['gym', 'Gym'], ['runs', 'Runs'], ['piano', 'Piano'], ['shifts', 'Shifts'], ['tasks', 'Tasks']], 'sm') + sub();
+  if (!['gym', 'piano', 'shifts', 'tasks'].includes(ui.lifeSeg)) ui.lifeSeg = 'gym';
+  const sub = { gym: viewGym, piano: viewPiano, shifts: viewShifts, tasks: viewTasks }[ui.lifeSeg];
+  return header('Life', '') + seg('lifeSeg', [['gym', 'Gym'], ['piano', 'Piano'], ['shifts', 'Shifts'], ['tasks', 'Tasks']]) + sub();
 }
 
 // shifts
@@ -1273,8 +1267,9 @@ function viewGym() {
   const nx = nextTemplate();
   const ss = [...G().sessions].sort((x, y) => y.date.localeCompare(x.date) || y.id.localeCompare(x.id));
   const other = [...(G().other || [])].sort((x, y) => y.date.localeCompare(x.date) || y.id.localeCompare(x.id));
-  const wk = ss.filter(s => s.date >= weekStart(today())).length + other.filter(o => o.date >= weekStart(today())).length;
-  const lastAny = [ss[0] && ss[0].date, other[0] && other[0].date].filter(Boolean).sort().pop();
+  const lastRun = [...S.runs].sort((x, y) => y.date.localeCompare(x.date))[0];
+  const wk = ss.filter(s => s.date >= weekStart(today())).length + other.filter(o => o.date >= weekStart(today())).length + S.runs.filter(r => r.date >= weekStart(today())).length;
+  const lastAny = [ss[0] && ss[0].date, other[0] && other[0].date, lastRun && lastRun.date].filter(Boolean).sort().pop();
   const names = [...new Set(ss.flatMap(s => s.exercises.map(e => e.name)))];
   const bests = names.map(n => { let b = null; ss.forEach(s => s.exercises.filter(e => e.name === n).forEach(e => e.sets.forEach(st => { if (!b || e1rm(st.w, st.r) > e1rm(b.w, b.r)) b = st; }))); return [n, b]; }).filter(x => x[1] && x[1].w);
   return dl + `
@@ -1287,7 +1282,9 @@ function viewGym() {
     <button class="btn block" data-a="startWorkout" data-t="${esc(nx.id)}" style="margin-top:8px">Start ${esc(nx.name)}</button>
     <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${G().templates.filter(t => t.id !== nx.id).map(t => `<button class="pill" data-a="startWorkout" data-t="${esc(t.id)}">Start ${esc(t.name)}</button>`).join('')}<button class="pill" data-a="startWorkout" data-t="">Empty workout</button></div>
   </section>` : `<button class="btn block" data-a="startWorkout" data-t="">Start an empty workout</button><button class="link" data-a="editTemplates">Set up a plan</button>`}
-  <div class="row" style="gap:8px"><button class="btn sec grow" data-a="pastWorkout">Log a past gym session</button><button class="btn sec grow" data-a="addOther">+ Other workout</button></div>
+  <div class="row" style="gap:8px"><button class="btn sec grow" data-a="addRun">🏃 + Run</button><button class="btn sec grow" data-a="addOther">+ Other workout</button></div>
+  <button class="link" data-a="pastWorkout" style="margin:2px 0 4px">Log a past gym session</button>
+  ${runsCard()}
   ${other.length ? `<section class="card"><h2>Other workouts</h2><ul class="list">${other.slice(0, 12).map(o => `<li class="tap" data-a="editOther" data-id="${o.id}"><div style="font-size:22px">${OTHER_ICON[o.type] || '🏅'}</div>
     <div class="grow"><div class="t">${esc(o.type)}${o.mins ? ` <span class="muted">· ${o.mins} min</span>` : ''}${o.dist ? ` <span class="muted">· ${esc(String(o.dist))} km</span>` : ''}</div><div class="s ellipsis">${fmtDate(o.date)}${o.feel ? ' · ' + FEELS[o.feel - 1] : ''}${o.notes ? ' · ' + esc(o.notes) : ''}</div></div></li>`).join('')}</ul></section>` : ''}
   ${G().templates.some(t => t.id === 'A') && G().sessions.length < 3 ? `<p class="small muted">The beginner plan: alternate A and B, 3 days a week with a rest day in between (e.g. Mon/Wed/Fri). When you hit the top of the rep range on every set, the app tells you to add weight next time. Use "Edit plan" to change exercises or add your own workouts.</p>` : ''}
@@ -1556,7 +1553,7 @@ function fitnessTodayRows() {
   const t = targets(), s = sumDay(today());
   rows.push(`<div class="wk tap" data-a="goto" data-v="food" data-s="eat"><div class="ic">🍽️</div><div class="grow"><div class="t">${r0(s.kcal).toLocaleString()} / ${t.kcal.toLocaleString()} kcal · ${r0(s.p)} / ${t.p} g protein</div>
     <div class="bar" style="margin-top:6px"><i style="width:${Math.min(100, s.p / t.p * 100)}%;background:var(--warn)"></i></div></div></div>`);
-  const a = G().active, nx = nextTemplate(), last = [...G().sessions, ...(G().other || [])].sort((x, y) => y.date.localeCompare(x.date))[0];
+  const a = G().active, nx = nextTemplate(), last = [...G().sessions, ...(G().other || []), ...S.runs].sort((x, y) => y.date.localeCompare(x.date))[0];
   rows.push(`<div class="wk tap" data-a="goto" data-v="life" data-s="gym"><div class="ic">🏋️</div><div class="grow"><div class="t">${a ? `${esc(a.name)} in progress` : nx ? `Next workout: ${esc(nx.name)}` : 'Gym'}</div>
     <div class="s muted">${last ? `Last workout ${fmtDate(last.date).toLowerCase()}` : 'No workouts logged yet'}</div></div></div>`);
   return rows.join('');
