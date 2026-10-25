@@ -233,6 +233,7 @@ const DEFAULTS = () => ({
   gym: { templates: null, sessions: [], active: null, other: [] },
   food: { log: [], saved: [], kcal: 0, p: 0 },
   body: { weights: null },
+  focus: {},
 });
 
 function merge(d) {
@@ -428,7 +429,7 @@ const seg = (key, opts, cls = '') => `<div class="seg ${cls}">${opts.map(([v, l]
 function choreDue(c) { return c.last ? addDays(c.last, c.every) : today(); }
 
 function weekCard() {
-  const rows = [fitnessTodayRows()];
+  const rows = [focusTodayRow(), fitnessTodayRows()];
   const sh = upcomingShifts()[0];
   if (sh) {
     const wkHours = shiftsInWeek(weekStart(today())).reduce((a, s) => a + shiftHours(s), 0);
@@ -538,7 +539,8 @@ function viewToday() {
     <div class="row between"><span>Grocery list</span><span class="pill">${listLeft} item${listLeft === 1 ? '' : 's'}</span></div>
     ${low.length ? `<div class="small muted" style="margin-top:8px">Running low: ${low.slice(0, 6).map(p => esc(p.name)).join(', ')}${low.length > 6 ? '…' : ''}</div>` : ''}
     ${expiring.length ? `<div class="small" style="margin-top:6px;color:var(--warn)">Use soon: ${expiring.map(p => `${esc(p.name)} (${dueLabel(p.exp).t.toLowerCase().replace('due ', '')})`).join(', ')}</div>` : ''}
-  </section>`;
+  </section>
+  <button class="btn sec block" data-a="openReview" style="margin-top:4px">🗓️ Week in review</button>`;
 }
 
 // ---------- MONEY ----------
@@ -1404,6 +1406,7 @@ function viewEat() {
     <div class="row between" style="margin-top:12px"><span><b class="big" style="font-size:24px">${r0(s.p)}</b> <span class="muted">/ ${t.p} g protein</span></span><span class="small muted">${s.p < t.p ? `${r0(t.p - s.p)} g to go` : 'target hit ✓'}</span></div>
     ${bar(s.p, t.p, 'var(--warn)')}
   </section>
+  ${proteinCard(d, t, s)}
   <div class="row"><button class="btn grow" data-a="foodAdd" data-v="saved">+ Add food</button>${dayLog(addDays(d, -1)).length && !items.length ? '<button class="btn sec" data-a="copyDay">Copy yesterday</button>' : ''}</div>
   <section class="card">
     ${items.length ? MEALS.filter(m => items.some(x => x.meal === m)).map(m => { const xs = items.filter(x => x.meal === m); const ms = xs.reduce((a, x) => ({ kcal: a.kcal + x.kcal, p: a.p + x.p }), { kcal: 0, p: 0 });
@@ -1563,10 +1566,170 @@ function fitnessTodayRows() {
 function ensureFit() {
   if (!S.gym.templates) S.gym.templates = BEGINNER();
   if (!S.gym.other) S.gym.other = [];
+  if (!S.focus) S.focus = {};
   if (!S.body.weights) S.body.weights = [{ date: today(), kg: 79.8 }];
 }
 
-const VIEWS = { today: viewToday, money: viewMoney, food: viewFood, study: viewStudy, life: viewLife };
+// ---------- PROTEIN IDEAS ----------
+// Approximate values for common UK supermarket items; used when you have few saved foods.
+const PROTEIN_IDEAS = [
+  { name: 'Whey shake (1 scoop, with water)', kcal: 120, p: 24, key: 'whey' },
+  { name: '0% Greek yoghurt, 200 g', kcal: 115, p: 20, key: 'yog' },
+  { name: 'Skyr, 150 g pot', kcal: 95, p: 16, key: 'skyr' },
+  { name: 'Cottage cheese, 200 g', kcal: 180, p: 22, key: 'cottage' },
+  { name: 'Tin of tuna, drained (~110 g)', kcal: 120, p: 27, key: 'tuna' },
+  { name: 'Chicken breast, cooked 150 g', kcal: 250, p: 45, key: 'chicken' },
+  { name: '3 eggs', kcal: 220, p: 19, key: 'egg' },
+  { name: 'Semi-skimmed milk, 500 ml', kcal: 240, p: 18, key: 'milk' },
+  { name: 'Protein bar', kcal: 200, p: 20, key: 'protein bar' },
+  { name: 'Edamame, 150 g', kcal: 180, p: 17, key: 'edamame' },
+];
+function proteinCombos(gap, kcalLeft) {
+  // Candidates: your saved foods (per serving, or per saved grams) plus the ideas list.
+  const mine = F().saved.map(x => x.per100 ? { name: `${x.name}, ${x.grams || 100} g`, kcal: x.kcal * (x.grams || 100) / 100, p: x.p * (x.grams || 100) / 100, mine: true, src: x }
+    : { name: x.name, kcal: x.kcal, p: x.p, mine: true, src: x })
+    .filter(x => x.p >= 8 && x.p * 4 >= x.kcal * 0.25); // protein-dense: at least a quarter of calories from protein
+  // Skip a built-in idea when you've saved your own version of it (e.g. your own whey shake).
+  const pool = [...mine, ...PROTEIN_IDEAS.filter(i => !F().saved.some(m => m.name.toLowerCase().includes(i.key)))];
+  const combos = [];
+  pool.forEach((a, i) => {
+    combos.push([a]);
+    pool.slice(i).forEach(b => combos.push(a === b ? [a, a] : [a, b]));
+  });
+  const score = c => {
+    const p = c.reduce((s, x) => s + x.p, 0), k = c.reduce((s, x) => s + x.kcal, 0);
+    const short = Math.max(0, gap - p), over = Math.max(0, p - gap - 15);
+    const kcalOver = Math.max(0, k - Math.max(kcalLeft, 0) - 150);
+    return short * 3 + over + kcalOver / 20 + c.length * 4 - c.filter(x => x.mine).length * 6 + (c.length === 2 && c[0] === c[1] ? 8 : 0);
+  };
+  const seen = new Set();
+  return combos.sort((x, y) => score(x) - score(y)).filter(c => { const key = c.map(x => x.name).sort().join('|'); if (seen.has(key)) return false; seen.add(key); return true; }).slice(0, 3)
+    .map(c => ({ items: c, p: c.reduce((s, x) => s + x.p, 0), kcal: c.reduce((s, x) => s + x.kcal, 0) }));
+}
+let shownCombos = [];
+function proteinCard(d, t, s) {
+  const gap = t.p - s.p;
+  if (d !== today() || gap < 15) return '';
+  const h = new Date().getHours();
+  // Earlier in the day, suggest a top-up for the next meal rather than the whole gap.
+  const aim = h < 14 ? Math.min(gap, 40) : h < 18 ? Math.min(gap, 60) : gap;
+  shownCombos = proteinCombos(aim, t.kcal - s.kcal);
+  if (!shownCombos.length) return '';
+  return `<section class="card" style="border-color:var(--warn)"><h2>${aim < gap ? `Protein: ${r0(gap)} g to go` : `Close the protein gap: ${r0(gap)} g`}</h2>
+    ${aim < gap ? `<p class="small muted" style="margin:-4px 0 6px">Plenty of day left. Aim for about ${r0(aim)} g at your next meal or snack. Ideas:</p>` : ''}
+    <ul class="list">${shownCombos.map((c, i) => { const names = []; c.items.forEach(x => { const prev = names.find(n => n.x === x); if (prev) prev.n++; else names.push({ x, n: 1 }); });
+      return `<li style="min-height:44px;padding:8px 0"><div class="grow"><div class="t small" style="font-size:15px">${names.map(o => `${o.n > 1 ? o.n + ' × ' : ''}${esc(o.x.name)}${o.x.mine ? '' : '<sup class="muted">≈</sup>'}`).join(' + ')}</div>
+        <div class="s">+${r0(c.p)} g protein · ${r0(c.kcal)} kcal${c.p >= gap - 2 ? ' · gets you there ✓' : ''}</div></div><button class="btn sm sec" data-a="addCombo" data-i="${i}">Add</button></li>`; }).join('')}</ul>
+    ${shownCombos.some(c => c.items.some(x => !x.mine)) ? '<p class="small muted" style="margin:6px 0 0">≈ typical values; check the label. Save foods you actually eat and they\'ll be suggested first.</p>' : ''}</section>`;
+}
+
+// ---------- WEEKLY REVIEW ----------
+function reviewWeekDefault() { const t = today(); return parse(t).getDay() === 0 ? weekStart(t) : addDays(weekStart(t), -7); }
+function weekStatsFor(ws) {
+  const we = addDays(ws, 6), inWk = d => d >= ws && d <= we, end = we < today() ? we : today();
+  const days = []; for (let d = ws; d <= end; d = addDays(d, 1)) days.push(d);
+  // fitness
+  const gym = G().sessions.filter(s => inWk(s.date));
+  const other = (G().other || []).filter(o => inWk(o.date));
+  const runs = S.runs.filter(r => inWk(r.date));
+  const prs = [];
+  gym.forEach(s => s.exercises.forEach(e => {
+    const best = Math.max(...e.sets.map(x => e1rm(x.w, x.r)));
+    const before = G().sessions.filter(o => o.date < ws).flatMap(o => o.exercises.filter(x => x.name === e.name).flatMap(x => x.sets)).reduce((m, x) => Math.max(m, e1rm(x.w, x.r)), 0);
+    if (before && best > before && !prs.includes(e.name)) prs.push(e.name);
+  }));
+  // food
+  const t = targets();
+  const logged = days.filter(d => d < today() && dayLog(d).length); // today isn't finished yet
+  const sums = logged.map(sumDay);
+  const avgP = sums.length ? sums.reduce((a, x) => a + x.p, 0) / sums.length : 0;
+  const avgK = sums.length ? sums.reduce((a, x) => a + x.kcal, 0) / sums.length : 0;
+  const pDays = sums.filter(x => x.p >= t.p * 0.95).length;
+  const wNow = avgWeight(end, 7), wPrev = avgWeight(addDays(ws, -1), 7);
+  // money
+  const spent = S.expenses.filter(e => inWk(e.date));
+  const total = spent.reduce((a, e) => a + e.amount, 0);
+  const cats = {}; spent.forEach(e => cats[e.cat] = (cats[e.cat] || 0) + e.amount);
+  const topCat = Object.entries(cats).sort((a, b) => b[1] - a[1])[0];
+  const prev4 = [1, 2, 3, 4].map(k => S.expenses.filter(e => e.date >= addDays(ws, -7 * k) && e.date <= addDays(ws, -7 * k + 6)).reduce((a, e) => a + e.amount, 0));
+  const usual = prev4.filter(x => x > 0).length ? prev4.reduce((a, x) => a + x, 0) / prev4.filter(x => x > 0).length : 0;
+  // study
+  const ticks = Object.values(S.cstate.done).filter(v => typeof v === 'string' && inWk(v)).length;
+  const ses = PLOTINUS.sessions.find(x => inWk(x.date));
+  const asgDueWk = C() ? C().assignments.filter(a => inWk(asgDue(a))) : [];
+  // piano, work, tasks
+  const plog = S.pieces.flatMap(p => p.log.filter(l => inWk(l.date)).map(l => ({ ...l, p })));
+  const shifts = S.shifts.filter(s => inWk(s.date));
+  const tasksDone = S.tasks.filter(x => x.done && x.doneAt && inWk(x.doneAt.slice(0, 10))).length;
+  const overdue = S.tasks.filter(x => !x.done && x.due && x.due < today()).length;
+  return { ws, we, days, gym, other, runs, prs, logged, avgP, avgK, pDays, t, wNow, wPrev, total, topCat, usual, ticks, ses, asgDueWk, plog, shifts, tasksDone, overdue };
+}
+function reviewSuggestions(st) {
+  const out = [];
+  const nws = addDays(st.ws, 7);
+  if (st.gym.length < 3) out.push(`Get to the gym 3 times (e.g. Mon/Wed/Fri)${st.gym.length ? `: up from ${st.gym.length}` : ''}`);
+  if (st.logged.length < 5) out.push('Log food on at least 5 days so the averages mean something');
+  else if (st.pDays < 5) out.push(`Hit ${st.t.p} g protein on 5+ days: plan a daily high-protein snack`);
+  const adv = weightAdvice();
+  if (/Try (adding|about 150 kcal a day less)/.test(adv)) out.push(adv.replace(/^You're gaining about [\d.]+ kg a month, /, '').replace(/^./, c => c.toUpperCase()));
+  if (C()) {
+    const fw = focusWeek();
+    if (fw && calWeek() > fw.n) out.push(`Finish course week ${fw.n} (${fw.title}) or push the plan back`);
+    C().assignments.filter(a => asgDue(a) >= nws && asgDue(a) <= addDays(nws, 6) && !['sent', 'assessed'].includes(asgStatus(a))).forEach(a => out.push(`Write A${a.n}: ${a.title} (due ${fmtDate(asgDue(a))})`));
+  }
+  const nextSes = PLOTINUS.sessions.find(x => x.date >= nws && x.date <= addDays(nws, 6) && x.label !== 'Catch-up');
+  if (nextSes && !S.study.read[nextSes.date]) out.push(`Read Plotinus ${nextSes.label.toLowerCase()} before Friday`);
+  S.pieces.filter(p => curStage(p) && !st.plog.some(l => l.p === p)).forEach(p => out.push(`Practise ${p.title} at least 3 times`));
+  if (st.overdue) out.push(`Clear ${st.overdue} overdue to-do${st.overdue > 1 ? 's' : ''}`);
+  return out.slice(0, 6);
+}
+function viewReview() {
+  const ws = ui.reviewWs || reviewWeekDefault();
+  const st = weekStatsFor(ws);
+  const nws = addDays(ws, 7);
+  const label = `${parse(ws).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} – ${parse(st.we).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`;
+  const row = (ic, title, sub, good) => `<div class="wk"><div class="ic">${ic}</div><div class="grow"><div class="t">${title}</div>${sub ? `<div class="s muted">${sub}</div>` : ''}</div>${good === true ? '<span class="pill good">✓</span>' : good === false ? '<span class="pill warn">!</span>' : ''}</div>`;
+  const focus = S.focus[nws] || [];
+  const sugg = reviewSuggestions(st);
+  const prevFocus = S.focus[ws] || [];
+  return `
+  <header class="top"><div><button class="link" data-a="goto" data-v="today">‹ Today</button><h1>Week in review</h1><div class="sub">${label}${ws === weekStart(today()) ? ' (so far)' : ''}</div></div></header>
+  <div class="row between" style="margin:-4px 0 4px"><button class="link" data-a="reviewWeek" data-v="-7">‹ Earlier</button><button class="link" data-a="reviewWeek" data-v="7" ${nws > today() ? 'style="visibility:hidden"' : ''}>Later ›</button></div>
+  ${prevFocus.length ? `<section class="card"><h2>Your focus for this week</h2>${prevFocus.map(f => `<div class="small" style="margin:4px 0">🎯 ${esc(f)}</div>`).join('')}</section>` : ''}
+  <section class="card"><h2>Body</h2>
+    ${row('🏋️', `${st.gym.length} gym session${st.gym.length === 1 ? '' : 's'}${st.other.length ? ` + ${st.other.length} other workout${st.other.length > 1 ? 's' : ''}` : ''}`, st.prs.length ? `New bests: ${st.prs.map(esc).join(', ')} 💪` : (st.gym.length ? 'Aim: 3 a week' : 'Aim: 3 a week, alternating A and B'), st.gym.length >= 3)}
+    ${row('🍽️', st.logged.length ? `Protein ${r0(st.avgP)} g a day on average (target ${st.t.p})` : 'No food logged', st.logged.length ? `Hit the target on ${st.pDays} of ${st.logged.length} logged day${st.logged.length > 1 ? 's' : ''} · ${r0(st.avgK).toLocaleString()} kcal average (target ${st.t.kcal.toLocaleString()})` : 'Log food to see your averages', st.logged.length ? st.pDays >= 5 : undefined)}
+    ${row('⚖️', st.wNow ? `Weight ${fmtKg(Math.round(st.wNow * 10) / 10)} (weekly average)` : 'No weigh-ins', st.wNow && st.wPrev ? `${st.wNow - st.wPrev >= 0 ? '+' : ''}${(st.wNow - st.wPrev).toFixed(1)} kg on the week before. Aim: about +0.25 kg a week` : 'Weigh in a few mornings to track the trend')}
+    ${st.runs.length ? row('🏃', `${st.runs.length} run${st.runs.length > 1 ? 's' : ''} · ${fmtDist(st.runs.reduce((a, r) => a + r.dist, 0))}`) : ''}
+  </section>
+  <section class="card"><h2>Mind</h2>
+    ${C() ? row('🕯️', `${st.ticks} course item${st.ticks === 1 ? '' : 's'} ticked off`, st.asgDueWk.length ? st.asgDueWk.map(a => `A${a.n} ${ASG_STATUS.find(x => x[0] === asgStatus(a))[1].toLowerCase()}`).join(' · ') : '') : ''}
+    ${st.ses && st.ses.label !== 'Catch-up' ? row('📜', `Plotinus ${st.ses.label.toLowerCase()}`, S.study.read[st.ses.date] ? 'Read ✓' : 'Not marked as read', !!S.study.read[st.ses.date]) : ''}
+    ${S.pieces.length ? row('🎹', st.plog.length ? `Piano: ${st.plog.length} session${st.plog.length > 1 ? 's' : ''}, ${st.plog.reduce((a, l) => a + (l.mins || 0), 0)} min` : 'No piano practice logged', '', st.plog.length >= 3) : ''}
+  </section>
+  <section class="card"><h2>Money & work</h2>
+    ${row('💸', `Spent ${money(st.total)}`, `${st.topCat ? `Most on ${esc(st.topCat[0])} (${money(st.topCat[1])})` : ''}${st.usual ? `${st.topCat ? ' · ' : ''}usual week ≈ ${money(Math.round(st.usual))}` : ''}`)}
+    ${row('☕', st.shifts.length ? `${st.shifts.length} shift${st.shifts.length > 1 ? 's' : ''} · ${fmtHours(st.shifts.reduce((a, s) => a + shiftHours(s), 0))}` : 'No shifts')}
+    ${row('✅', `${st.tasksDone} to-do${st.tasksDone === 1 ? '' : 's'} done`, st.overdue ? `${st.overdue} overdue` : '')}
+  </section>
+  <section class="card"><h2>Focus for the week of ${parse(nws).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</h2>
+    <form id="focusForm">
+      ${[...new Set([...focus, ...sugg])].map(f => `<label class="chk" style="align-items:flex-start"><input type="checkbox" name="f" value="${esc(f)}" ${focus.includes(f) ? 'checked' : ''}><span class="small" style="font-size:15px">${esc(f)}</span></label>`).join('')}
+      <input name="custom" placeholder="Add your own focus…" style="margin-bottom:10px">
+      <button type="button" class="btn block" data-a="saveFocus" data-w="${nws}">${focus.length ? 'Update focus' : 'Set focus for next week'}</button>
+    </form>
+    <p class="small muted" style="margin:8px 0 0">Pick 2 or 3. They'll show on Today all next week.</p>
+  </section>`;
+}
+function focusTodayRow() {
+  const t = today(), ws = weekStart(t), f = S.focus[ws] || [], dow = parse(t).getDay();
+  const rows = [];
+  if (f.length) rows.push(`<div class="wk tap" data-a="openReview" data-v="${addDays(ws, -7)}"><div class="ic">🎯</div><div class="grow"><div class="t">This week's focus</div><div class="s muted">${f.map(esc).join(' · ')}</div></div></div>`);
+  if (dow === 0 || (dow === 1 && !f.length)) rows.push(`<div class="wk tap" data-a="openReview" data-v="${dow === 0 ? ws : addDays(ws, -7)}"><div class="ic">🗓️</div><div class="grow"><div class="t">Review your week</div><div class="s muted">See how it went and pick next week's focus</div></div></div>`);
+  return rows.join('');
+}
+
+const VIEWS = { today: viewToday, money: viewMoney, food: viewFood, study: viewStudy, life: viewLife, review: viewReview };
 
 // ---------- sheet (forms) ----------
 let sheetSubmit = null;
@@ -1826,7 +1989,7 @@ const ACTIONS = {
   chair: el => { const d = el.dataset.d; S.study.chair[d] = !S.study.chair[d]; save(); render(); },
   bgRead: el => { const i = el.dataset.i; S.study.bg[i] = !S.study.bg[i]; save(); render(); },
   openIdea: el => ideaForm(S.ideas.find(i => i.key === el.dataset.id)),
-  citem: el => { const w = C().weeks.find(x => x.n === Number(el.dataset.w)); const it = w.items[Number(el.dataset.i)]; const k = itemKey(w, it); S.cstate.done[k] = !S.cstate.done[k]; save(); render(); if (S.cstate.done[k] && weekDone(w)) toast(`Week ${w.n} done ✓`); },
+  citem: el => { const w = C().weeks.find(x => x.n === Number(el.dataset.w)); const it = w.items[Number(el.dataset.i)]; const k = itemKey(w, it); S.cstate.done[k] = S.cstate.done[k] ? false : today(); save(); render(); if (S.cstate.done[k] && weekDone(w)) toast(`Week ${w.n} done ✓`); },
   shiftPlan: el => { S.cstate.offset = Math.max(0, (S.cstate.offset || 0) + Number(el.dataset.v)); save(); render(); toast(Number(el.dataset.v) > 0 ? 'Plan pushed back a week' : 'Shift undone'); },
   haveBook: el => { S.cstate.have[el.dataset.t] = 'yes'; save(); render(); },
   openAsg: el => asgForm(C().assignments.find(a => a.n === Number(el.dataset.n))),
@@ -1869,6 +2032,15 @@ const ACTIONS = {
   },
   logWeight: weightForm,
   editTargets: targetsForm,
+  openReview: el => { ui.reviewWs = el.dataset.v || reviewWeekDefault(); go('review'); },
+  reviewWeek: el => { ui.reviewWs = addDays(ui.reviewWs || reviewWeekDefault(), Number(el.dataset.v)); render(); window.scrollTo(0, 0); },
+  saveFocus: el => {
+    const fm = $('#focusForm'); const picked = [...fm.querySelectorAll('[name=f]:checked')].map(x => x.value);
+    const custom = fm.custom.value.trim(); if (custom) picked.push(custom);
+    if (!S.focus) S.focus = {};
+    S.focus[el.dataset.w] = picked; save(); render(); toast(picked.length ? 'Focus set for next week 🎯' : 'Focus cleared');
+  },
+  addCombo: el => { const c = shownCombos[Number(el.dataset.i)]; const meal = defaultMeal(); c.items.forEach(x => { logFood({ name: x.name, kcal: x.kcal, p: x.p, meal, qty: x.src && x.src.per100 ? `${x.src.grams || 100} g` : '' }); if (x.src) x.src.used = (x.src.used || 0) + 1; }); save(); render(); toast(`Added +${r0(c.p)} g protein`); },
   closeSheet: closeSheet,
   sheetDel: () => { if (sheetDel && confirm('Delete this?')) { sheetDel(); save(); closeSheet(); render(); } },
   export: async () => {
