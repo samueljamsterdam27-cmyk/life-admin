@@ -1256,7 +1256,7 @@ function viewGym() {
     <div class="row small muted" style="gap:8px;margin:6px 0 2px"><span style="width:22px">Set</span><span class="grow">kg</span><span class="grow">reps</span><span style="width:26px"></span></div>
     ${e.sets.map((s, j) => `<div class="row" style="gap:8px;margin:6px 0">
       <span style="width:22px;text-align:center;font-weight:600">${j + 1}</span>
-      <input class="grow" type="number" inputmode="decimal" step="0.5" value="${s.w}" data-g="w" data-e="${i}" data-s="${j}" placeholder="kg" style="min-height:40px;padding:6px 10px">
+      <input class="grow" type="number" inputmode="decimal" step="any" value="${s.w}" data-g="w" data-e="${i}" data-s="${j}" placeholder="kg" style="min-height:40px;padding:6px 10px">
       <input class="grow" type="number" inputmode="numeric" value="${s.r}" data-g="r" data-e="${i}" data-s="${j}" placeholder="${e.hi ? e.lo + '–' + e.hi : 'reps'}" style="min-height:40px;padding:6px 10px">
       <button class="check ${s.done ? 'on' : ''}" data-a="setDone" data-e="${i}" data-s="${j}">${s.done ? ICON_CHECK : ''}</button></div>`).join('')}
     <div class="row between" style="margin-top:4px"><button class="link small" data-a="addSet" data-e="${i}">+ Add set</button><button class="link small" data-a="rmExercise" data-e="${i}" style="color:var(--muted)">Remove exercise</button></div>
@@ -1286,12 +1286,13 @@ function viewGym() {
   <button class="link" data-a="pastWorkout" style="margin:2px 0 4px">Log a past gym session</button>
   ${runsCard()}
   ${other.length ? `<section class="card"><h2>Other workouts</h2><ul class="list">${other.slice(0, 12).map(o => `<li class="tap" data-a="editOther" data-id="${o.id}"><div style="font-size:22px">${OTHER_ICON[o.type] || '🏅'}</div>
-    <div class="grow"><div class="t">${esc(o.type)}${o.mins ? ` <span class="muted">· ${o.mins} min</span>` : ''}${o.dist ? ` <span class="muted">· ${esc(String(o.dist))} km</span>` : ''}</div><div class="s ellipsis">${fmtDate(o.date)}${o.feel ? ' · ' + FEELS[o.feel - 1] : ''}${o.notes ? ' · ' + esc(o.notes) : ''}</div></div></li>`).join('')}</ul></section>` : ''}
+    <div class="grow"><div class="t">${esc(o.type)}${o.mins ? ` <span class="muted">· ${o.mins} min</span>` : ''}${o.dist ? ` <span class="muted">· ${fmtOtherDist(o)}</span>` : ''}</div><div class="s ellipsis">${fmtDate(o.date)}${o.feel ? ' · ' + FEELS[o.feel - 1] : ''}${o.notes ? ' · ' + esc(o.notes) : ''}</div></div></li>`).join('')}</ul></section>` : ''}
   ${G().templates.some(t => t.id === 'A') && G().sessions.length < 3 ? `<p class="small muted">The beginner plan: alternate A and B, 3 days a week with a rest day in between (e.g. Mon/Wed/Fri). When you hit the top of the rep range on every set, the app tells you to add weight next time. Use "Edit plan" to change exercises or add your own workouts.</p>` : ''}
   ${ss.length ? `<section class="card"><h2>History</h2><ul class="list">${ss.slice(0, 15).map(s => `<li class="tap" data-a="openSession" data-id="${s.id}"><div class="grow"><div class="t">${esc(s.name)}</div>
     <div class="s ellipsis">${fmtDate(s.date)} · ${s.exercises.length} exercises · ${s.exercises.reduce((n, e) => n + e.sets.length, 0)} sets${s.mins ? ` · ${s.mins} min` : ''}</div></div></li>`).join('')}</ul></section>` : ''}
   ${bests.length ? `<section class="card"><h2>Best sets</h2><ul class="list">${bests.map(([n, b]) => `<li class="tap" data-a="exHistory" data-n="${esc(n)}" style="min-height:40px;padding:8px 0"><span class="grow">${esc(n)}</span><span class="amt">${fmtKg(b.w)} × ${b.r}</span></li>`).join('')}</ul></section>` : ''}`;
 }
+const fmtOtherDist = o => o.unit === 'm' ? `${Math.round(o.dist * 1000).toLocaleString()} m` : `${Math.round(o.dist * 1000) / 1000} km`;
 const OTHER_TYPES = ['Class', 'Swim', 'Cycle', 'Football', 'Yoga', 'Walk / hike', 'Climbing', 'HIIT', 'Rowing', 'Sport'];
 const OTHER_ICON = { Class: '🤸', Swim: '🏊', Cycle: '🚴', Football: '⚽', Yoga: '🧘', 'Walk / hike': '🥾', Climbing: '🧗', HIIT: '🔥', Rowing: '🚣', Sport: '🏸' };
 function pastWorkoutForm() {
@@ -1305,20 +1306,26 @@ function pastWorkoutForm() {
 function otherForm(o) {
   const isNew = !o;
   o = o || { date: today(), type: '', mins: '', dist: '', feel: 0, notes: '' };
+  const distUnit = o.unit || (/swim|row/i.test(o.type) ? 'm' : 'km');
   openSheet(isNew ? 'Log a workout' : 'Edit workout', `
     <label class="f"><span>What did you do?</span><input name="type" value="${esc(o.type)}" list="otherTypes" required placeholder="e.g. Swim, spin class, 5-a-side" ${isNew ? 'autofocus' : ''}></label>
     <datalist id="otherTypes">${OTHER_TYPES.map(t => `<option value="${t}">`).join('')}</datalist>
     <div class="row" style="gap:6px;margin:-6px 0 12px;flex-wrap:wrap">${OTHER_TYPES.map(t => `<button type="button" class="pill" data-a="setOtherType" data-v="${t}">${OTHER_ICON[t]} ${t}</button>`).join('')}</div>
-    <div class="f3">
+    <div class="f2">
       <label class="f"><span>Date</span><input name="date" type="date" value="${o.date}" max="${today()}" required></label>
       <label class="f"><span>Minutes</span><input name="mins" type="number" inputmode="numeric" min="0" value="${o.mins}"></label>
-      <label class="f"><span>Km (optional)</span><input name="dist" type="number" inputmode="decimal" step="0.1" min="0" value="${o.dist}"></label>
+    </div>
+    <div class="f2">
+      <label class="f"><span>Distance (optional)</span><input name="dist" type="number" inputmode="decimal" step="any" min="0" value="${o.dist ? (distUnit === 'm' ? Math.round(o.dist * 1000) : o.dist) : ''}" placeholder="${distUnit === 'm' ? 'e.g. 425' : 'e.g. 0.425'}"></label>
+      <label class="f"><span>Unit</span><select name="unit"><option value="m" ${distUnit === 'm' ? 'selected' : ''}>metres</option><option value="km" ${distUnit === 'km' ? 'selected' : ''}>km</option></select></label>
     </div>
     <label class="f"><span>How did it feel?</span></label>
     <div class="feel" style="margin:-8px 0 12px">${FEELS.map((e, i) => `<label><input type="radio" name="feel" value="${i + 1}" ${o.feel === i + 1 ? 'checked' : ''}><span>${e}</span></label>`).join('')}</div>
     <label class="f"><span>Notes</span><input name="notes" value="${esc(o.notes)}" placeholder="e.g. 40 lengths, legs tired"></label>`,
     f => {
-      const data = { date: f.date, type: f.type.trim(), mins: parseInt(f.mins) || 0, dist: parseFloat(f.dist) || 0, feel: parseInt(f.feel) || 0, notes: f.notes.trim() };
+      // Stored in km; the unit is kept so it's shown back the way you entered it.
+      const raw = parseFloat(String(f.dist).replace(',', '.')) || 0;
+      const data = { date: f.date, type: f.type.trim(), mins: parseInt(f.mins) || 0, dist: f.unit === 'm' ? raw / 1000 : raw, unit: f.unit, feel: parseInt(f.feel) || 0, notes: f.notes.trim() };
       if (!G().other) G().other = [];
       if (isNew) { G().other.push({ id: uid(), ...data }); toast(`${data.type} logged 💪`); } else Object.assign(o, data);
     }, { del: isNew ? null : () => { G().other = G().other.filter(x => x !== o); } });
@@ -1436,7 +1443,7 @@ function foodAddSheet(mode, q = '') {
     openSheet('Add food', tabs + `
       <label class="f"><span>What (optional)</span><input name="name" placeholder="e.g. Chicken wrap"></label>
       <div class="f2"><label class="f"><span>Calories</span><input name="kcal" type="number" inputmode="numeric" min="0" required autofocus></label>
-      <label class="f"><span>Protein (g)</span><input name="p" type="number" inputmode="decimal" min="0" step="0.1" value="0"></label></div>
+      <label class="f"><span>Protein (g)</span><input name="p" type="number" inputmode="decimal" min="0" step="any" value="0"></label></div>
       <label class="chk"><input type="checkbox" name="keep"> Save it for next time</label>`,
       f => {
         const kcal = Number(f.kcal) || 0, p = Number(f.p) || 0, name = f.name.trim() || 'Quick add';
@@ -1526,7 +1533,7 @@ function entryForm(x) {
 }
 function weightForm() {
   openSheet('Log body weight', `
-    <div class="f2"><label class="f"><span>Weight (kg)</span><input name="kg" type="number" inputmode="decimal" step="0.1" min="20" required value="${latestWeight()}" autofocus></label>
+    <div class="f2"><label class="f"><span>Weight (kg)</span><input name="kg" type="number" inputmode="decimal" step="any" min="20" required value="${latestWeight()}" autofocus></label>
     <label class="f"><span>Date</span><input name="date" type="date" value="${today()}" required></label></div>
     <p class="small muted">Best first thing in the morning. Day-to-day swings of 1 kg are normal (water, food), so the app goes by your weekly average.</p>`,
     f => { S.body.weights = S.body.weights.filter(w => w.date !== f.date); S.body.weights.push({ date: f.date, kg: Number(f.kg) }); toast('Weight logged'); });
@@ -1799,7 +1806,7 @@ function runForm(r) {
   const h = Math.floor(r.secs / 3600), m = Math.floor(r.secs % 3600 / 60), s = r.secs % 60;
   openSheet(isNew ? 'Log a run' : 'Edit run', `
     <div class="f2">
-      <label class="f"><span>Distance (${S.settings.unit})</span><input name="dist" type="number" inputmode="decimal" step="0.01" min="0" required value="${r.dist}" ${isNew ? 'autofocus' : ''}></label>
+      <label class="f"><span>Distance (${S.settings.unit})</span><input name="dist" type="number" inputmode="decimal" step="any" min="0" required value="${r.dist}" ${isNew ? 'autofocus' : ''}></label>
       <label class="f"><span>Date</span><input name="date" type="date" value="${r.date}" required></label>
     </div>
     <label class="f"><span>Time</span></label>
@@ -2012,7 +2019,7 @@ const ACTIONS = {
   pastWorkout: pastWorkoutForm,
   addOther: () => otherForm(),
   editOther: el => otherForm(G().other.find(o => o.id === el.dataset.id)),
-  setOtherType: el => { $('#sheetForm [name=type]').value = el.dataset.v; },
+  setOtherType: el => { $('#sheetForm [name=type]').value = el.dataset.v; $('#sheetForm [name=unit]').value = /swim|row/i.test(el.dataset.v) ? 'm' : 'km'; },
   resetPlan: () => { if (confirm('Replace your workouts with the beginner plan (A and B)?')) { G().templates = BEGINNER(); save(); closeSheet(); render(); toast('Beginner plan restored'); } },
   foodAdd: el => foodAddSheet(el.dataset.v, ($('#sheetForm [name=q]') || {}).value || ''),
   foodSearch: () => runFoodSearch(),
